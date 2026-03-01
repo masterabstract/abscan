@@ -143,9 +143,12 @@ export default function Collection() {
               const price = parseFloat(l.price?.current?.value || 0) / 1e18;
               const isDeal = floor > 0 && price <= floor * 1.02;
               const pct = floor > 0 ? ((price - floor) / floor * 100).toFixed(1) : null;
-              const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria || l.order_hash?.slice(0,6) || '—';
-              return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${isDeal ? 'var(--green)' : 'var(--border2)'}` }}>
+              const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria 
+             || l.taker_asset_bundle?.assets?.[0]?.token_id
+             || l.maker_asset_bundle?.assets?.[0]?.token_id
+             || l.order_hash?.slice(0,8) 
+  || '—';                
+          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${isDeal ? 'var(--green)' : 'var(--border2)'}` }}>
                   <div>
                     <div style={{ fontSize: 12, color: 'var(--text)' }}>#{tokenId}</div>
                     {pct !== null && <div style={{ fontSize: 10, color: parseFloat(pct) <= 0 ? 'var(--green)' : 'var(--muted)', marginTop: 2 }}>{parseFloat(pct) <= 0 ? `▼ ${Math.abs(pct)}% sous floor` : `+${pct}% vs floor`}</div>}
