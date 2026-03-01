@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAccount } from 'wagmi';
+import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { COLLECTIONS, API_BASE, computeScore } from '../config';
 
@@ -13,15 +12,9 @@ function getScoreColor(score, max) {
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const { isConnected } = useAccount();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
-
-  useEffect(() => {
-    if (!isConnected) navigate('/connect');
-  }, [isConnected, navigate]);
 
   async function fetchCollection(c) {
     const r = await fetch(`${API_BASE}/stats?slug=${c.slug}`);
@@ -44,9 +37,7 @@ export default function Dashboard() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    if (isConnected) loadAll();
-  }, [isConnected]);
+  useEffect(() => { loadAll(); }, []);
 
   const okData = data.filter(d => d.ok);
   const totalVol = okData.reduce((s, d) => s + d.volume, 0);
@@ -121,10 +112,10 @@ export default function Dashboard() {
                     <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{d.chain}</div>
                   </td>
                   <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                    {d.ok ? <><span style={{ color: 'var(--white)' }}>{d.floor.toFixed(4)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span></> : '—'}
+                    {d.ok && d.floor > 0 ? <><span style={{ color: 'var(--white)' }}>{d.floor.toFixed(4)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span></> : '—'}
                   </td>
                   <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                    {d.ok ? <><span style={{ color: 'var(--text)' }}>{d.volume.toFixed(2)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span></> : '—'}
+                    {d.ok && d.volume > 0 ? <><span style={{ color: 'var(--text)' }}>{d.volume.toFixed(2)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span></> : '—'}
                   </td>
                   <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', minWidth: 160 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -135,19 +126,17 @@ export default function Dashboard() {
                     </div>
                   </td>
                   <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                    {d.ok ? (
-                      <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '6px 14px', background: 'transparent',
-                        border: '1px solid var(--border2)', color: 'var(--muted)',
-                        fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, textDecoration: 'none',
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--green)'; e.currentTarget.style.color = 'var(--green)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)'; }}
-                      >
-                        Analyser →
-                      </Link>
-                    ) : <span style={{ fontSize: 10, color: 'var(--red)' }}>Erreur API</span>}
+                    <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 14px', background: 'transparent',
+                      border: '1px solid var(--border2)', color: 'var(--muted)',
+                      fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, textDecoration: 'none',
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--green)'; e.currentTarget.style.color = 'var(--green)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)'; }}
+                    >
+                      Analyser →
+                    </Link>
                   </td>
                 </tr>
               ))}
