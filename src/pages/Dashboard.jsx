@@ -34,25 +34,19 @@ export default function Dashboard() {
     const volume = d.total?.volume || 0;
     const numOwners = d.total?.num_owners || 0;
     const totalSupply = d.total?.total_supply || 0;
-
     const day = d.intervals?.find(i => i.interval === 'one_day') || {};
     const volume24h = day.volume || 0;
     const sales24h = day.sales || 0;
     const volumeChange = day.volume_change ? day.volume_change * 100 : null;
-
-    // Variation floor 24h estimée via volume change
-    const floorChange = volumeChange;
-
     const score = computeScore(floor, volume24h, sales24h, totalSupply, numOwners);
-
-    return { ...c, floor, volume, volume24h, sales24h, volumeChange, floorChange, numOwners, totalSupply, score, ok: true };
+    return { ...c, floor, volume, volume24h, sales24h, volumeChange, floorChange: volumeChange, numOwners, totalSupply, score, image_url: d.image_url || null, ok: true };
   }
 
   async function loadAll() {
     setLoading(true);
     const results = await Promise.allSettled(COLLECTIONS.map(fetchCollection));
     const rows = results.map((r, i) =>
-      r.status === 'fulfilled' ? r.value : { ...COLLECTIONS[i], floor: 0, volume: 0, volume24h: 0, sales24h: 0, volumeChange: null, floorChange: null, score: 0, ok: false }
+      r.status === 'fulfilled' ? r.value : { ...COLLECTIONS[i], floor: 0, volume: 0, volume24h: 0, sales24h: 0, volumeChange: null, floorChange: null, score: 0, image_url: null, ok: false }
     );
     rows.sort((a, b) => b.score - a.score);
     setData(rows);
@@ -87,7 +81,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Stats globales */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 24 }}>
         {[
           { label: 'Volume 24h', value: loading ? '—' : totalVol24h.toFixed(2), sub: 'ETH today', color: 'var(--white)' },
@@ -103,7 +96,6 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Table */}
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase' }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
@@ -132,15 +124,26 @@ export default function Dashboard() {
                   >
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', color: 'var(--dim)', fontSize: 11, fontWeight: 700 }}>#{i+1}</td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 15, color: 'var(--white)', textDecoration: 'none' }}>
-                          {d.name}
-                        </Link>
-                        {d.verified && (
-                          <span style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', borderRadius: 3, padding: '2px 6px', fontSize: 9, color: 'var(--green)', letterSpacing: 1 }}>✓ VERIFIED</span>
-                        )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 4, overflow: 'hidden', background: 'var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {d.image_url ? (
+                            <img src={d.image_url} alt={d.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <span style={{ fontSize: 14, color: 'var(--border2)' }}>◈</span>
+                          )}
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 15, color: 'var(--white)', textDecoration: 'none' }}>
+                              {d.name}
+                            </Link>
+                            {d.verified && (
+                              <span style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', borderRadius: 3, padding: '2px 6px', fontSize: 9, color: 'var(--green)', letterSpacing: 1 }}>✓</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{d.chain}</div>
+                        </div>
                       </div>
-                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{d.chain}</div>
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                       {d.ok && d.floor > 0 ? (
