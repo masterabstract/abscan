@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { useAccount } from 'wagmi';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { Chart, registerables } from 'chart.js';
 import Layout from '../components/Layout';
 import { API_BASE, computeScore } from '../config';
@@ -11,8 +10,6 @@ export default function Collection() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const name = searchParams.get('name') || slug;
-  const { isConnected } = useAccount();
-  const navigate = useNavigate();
 
   const [stats, setStats] = useState(null);
   const [listings, setListings] = useState([]);
@@ -23,10 +20,6 @@ export default function Collection() {
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const sniperInterval = useRef(null);
-
-  useEffect(() => {
-    if (!isConnected) navigate('/connect');
-  }, [isConnected, navigate]);
 
   async function loadStats() {
     setLoadingStats(true);
@@ -86,7 +79,6 @@ export default function Collection() {
   }
 
   useEffect(() => {
-    if (!isConnected) return;
     loadStats();
     loadSniper();
     sniperInterval.current = setInterval(loadSniper, 15000);
@@ -94,7 +86,7 @@ export default function Collection() {
       clearInterval(sniperInterval.current);
       if (chartInstance.current) chartInstance.current.destroy();
     };
-  }, [slug, isConnected]);
+  }, [slug]);
 
   return (
     <Layout title="Collection Analytics">
@@ -143,15 +135,20 @@ export default function Collection() {
               const price = parseFloat(l.price?.current?.value || 0) / 1e18;
               const isDeal = floor > 0 && price <= floor * 1.02;
               const pct = floor > 0 ? ((price - floor) / floor * 100).toFixed(1) : null;
-              const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria 
-             || l.taker_asset_bundle?.assets?.[0]?.token_id
-             || l.maker_asset_bundle?.assets?.[0]?.token_id
-             || l.order_hash?.slice(0,8) 
-  || '—';                
-          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${isDeal ? 'var(--green)' : 'var(--border2)'}` }}>
+              const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria
+                || l.taker_asset_bundle?.assets?.[0]?.token_id
+                || l.maker_asset_bundle?.assets?.[0]?.token_id
+                || l.order_hash?.slice(0, 8)
+                || '—';
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${isDeal ? 'var(--green)' : 'var(--border2)'}` }}>
                   <div>
                     <div style={{ fontSize: 12, color: 'var(--text)' }}>#{tokenId}</div>
-                    {pct !== null && <div style={{ fontSize: 10, color: parseFloat(pct) <= 0 ? 'var(--green)' : 'var(--muted)', marginTop: 2 }}>{parseFloat(pct) <= 0 ? `▼ ${Math.abs(pct)}% sous floor` : `+${pct}% vs floor`}</div>}
+                    {pct !== null && (
+                      <div style={{ fontSize: 10, color: parseFloat(pct) <= 0 ? 'var(--green)' : 'var(--muted)', marginTop: 2 }}>
+                        {parseFloat(pct) <= 0 ? `▼ ${Math.abs(pct)}% sous floor` : `+${pct}% vs floor`}
+                      </div>
+                    )}
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: isDeal ? 'var(--green)' : 'var(--white)' }}>{price.toFixed(4)} ETH</div>
