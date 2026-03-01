@@ -21,6 +21,43 @@ function Change({ value }) {
   );
 }
 
+function WatchBtn({ collection }) {
+  const [watched, setWatched] = useState(false);
+
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem('abstrack_watchlist') || '[]');
+    setWatched(saved.some(c => c.slug === collection.slug));
+  }, [collection.slug]);
+
+  function toggle() {
+    const saved = JSON.parse(localStorage.getItem('abstrack_watchlist') || '[]');
+    let updated;
+    if (watched) {
+      updated = saved.filter(c => c.slug !== collection.slug);
+    } else {
+      updated = [...saved, { name: collection.name, slug: collection.slug, chain: collection.chain }];
+    }
+    localStorage.setItem('abstrack_watchlist', JSON.stringify(updated));
+    setWatched(!watched);
+  }
+
+  return (
+    <button onClick={toggle} style={{
+      padding: '6px 10px', background: 'transparent',
+      border: `1px solid ${watched ? 'var(--cyan)' : 'var(--border2)'}`,
+      color: watched ? 'var(--cyan)' : 'var(--muted)',
+      fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, cursor: 'pointer',
+      transition: 'all 0.15s',
+    }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--cyan)'; e.currentTarget.style.color = 'var(--cyan)'; }}
+      onMouseLeave={e => { if (!watched) { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)'; } }}
+      title={watched ? 'Retirer de la watchlist' : 'Ajouter à la watchlist'}
+    >
+      {watched ? '★' : '☆'}
+    </button>
+  );
+}
+
 export default function Dashboard() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -176,17 +213,20 @@ export default function Dashboard() {
                       </div>
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                      <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '6px 14px', background: 'transparent',
-                        border: '1px solid var(--border2)', color: 'var(--muted)',
-                        fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, textDecoration: 'none',
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--green)'; e.currentTarget.style.color = 'var(--green)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)'; }}
-                      >
-                        Analyser →
-                      </Link>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <WatchBtn collection={d} />
+                        <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 6,
+                          padding: '6px 14px', background: 'transparent',
+                          border: '1px solid var(--border2)', color: 'var(--muted)',
+                          fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, textDecoration: 'none',
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--green)'; e.currentTarget.style.color = 'var(--green)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)'; }}
+                        >
+                          Analyser →
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

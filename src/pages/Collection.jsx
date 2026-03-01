@@ -16,10 +16,28 @@ export default function Collection() {
   const [loadingStats, setLoadingStats] = useState(true);
   const [sniperStatus, setSniperStatus] = useState('Initialisation...');
   const [floor, setFloor] = useState(0);
+  const [watched, setWatched] = useState(false);
 
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
   const sniperInterval = useRef(null);
+
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem('abstrack_watchlist') || '[]');
+    setWatched(saved.some(c => c.slug === slug));
+  }, [slug]);
+
+  function toggleWatch() {
+    const saved = JSON.parse(localStorage.getItem('abstrack_watchlist') || '[]');
+    let updated;
+    if (watched) {
+      updated = saved.filter(c => c.slug !== slug);
+    } else {
+      updated = [...saved, { name, slug, chain: 'abstract' }];
+    }
+    localStorage.setItem('abstrack_watchlist', JSON.stringify(updated));
+    setWatched(!watched);
+  }
 
   async function loadStats() {
     setLoadingStats(true);
@@ -80,11 +98,7 @@ export default function Collection() {
         const price = parseFloat(l.price?.current?.value || 0) / 1e18;
         const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria || '—';
         const contractAddress = l.protocol_data?.parameters?.offer?.[0]?.token || '';
-        return {
-          price, tokenId, contractAddress,
-          image_url: l.image_url || null,
-          name: l.name || null,
-        };
+        return { price, tokenId, contractAddress, image_url: l.image_url || null, name: l.name || null };
       });
       items.sort((a, b) => a.price - b.price);
       setListings(items);
@@ -104,14 +118,26 @@ export default function Collection() {
 
   return (
     <Layout title="Collection Analytics">
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>Collection Analytics</div>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, fontWeight: 800, color: 'var(--white)', letterSpacing: '-1px' }}>{name}</h1>
-        <div style={{ fontSize: 11, marginTop: 6 }}>
-          <a href={`https://opensea.io/collection/${slug}`} target="_blank" rel="noreferrer" style={{ color: 'var(--cyan)', textDecoration: 'none' }}>
-            opensea.io/collection/{slug} ↗
-          </a>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>Collection Analytics</div>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, fontWeight: 800, color: 'var(--white)', letterSpacing: '-1px' }}>{name}</h1>
+          <div style={{ fontSize: 11, marginTop: 6 }}>
+            <a href={`https://opensea.io/collection/${slug}`} target="_blank" rel="noreferrer" style={{ color: 'var(--cyan)', textDecoration: 'none' }}>
+              opensea.io/collection/{slug} ↗
+            </a>
+          </div>
         </div>
+        <button onClick={toggleWatch} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8,
+          padding: '10px 20px', background: 'transparent',
+          border: `1px solid ${watched ? 'var(--cyan)' : 'var(--border2)'}`,
+          color: watched ? 'var(--cyan)' : 'var(--muted)',
+          fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer',
+          borderRadius: 3, letterSpacing: 1, transition: 'all 0.15s',
+        }}>
+          {watched ? '★ Watchlisté' : '☆ Ajouter à la watchlist'}
+        </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 24 }}>
