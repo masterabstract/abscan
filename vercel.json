@@ -1,7 +1,5 @@
 {
   "rewrites": [
-    { "source": "/api/stats", "destination": "/api/stats.cjs" },
-    { "source": "/api/listings", "destination": "/api/listings.cjs" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
