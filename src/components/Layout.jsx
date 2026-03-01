@@ -17,11 +17,11 @@ export default function Layout({ children, title }) {
             fontFamily: 'var(--display)', fontWeight: 800, fontSize: 18,
             color: 'var(--white)', letterSpacing: '-0.5px', textDecoration: 'none',
           }}>
-            Abst<span style={{ color: 'var(--green)' }}>Scan</span>
+            ABS<span style={{ color: 'var(--green)' }}>TRACK</span>
           </Link>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-            <Link to="/" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'none', letterSpacing: 1 }}
+            <Link to="/dashboard" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'none', letterSpacing: 1 }}
               onMouseEnter={e => e.currentTarget.style.color = 'var(--white)'}
               onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
             >
