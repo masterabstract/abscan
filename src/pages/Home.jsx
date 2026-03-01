@@ -13,6 +13,8 @@ export default function Home() {
         .hero-stats { animation: fadeUp 0.8s 0.6s ease forwards; opacity:0; }
         .feature-card:hover { transform: translateY(-4px); background: var(--bg3) !important; }
         .feature-card { transition: all 0.2s; }
+        .nav-link { font-size:11px; color:var(--muted); text-decoration:none; letter-spacing:1px; transition: color 0.15s; }
+        .nav-link:hover { color: var(--white); }
       `}</style>
 
       <nav style={{
@@ -26,27 +28,16 @@ export default function Home() {
             ABS<span style={{ color: 'var(--green)' }}>TRACK</span>
           </span>
           <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
-            <Link to="/dashboard" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'none', letterSpacing: 1 }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--white)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
-            >DASHBOARD</Link>
-            <Link to="/watchlist" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'none', letterSpacing: 1 }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--cyan)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
-            >WATCHLIST</Link>
-            <Link to="/submit" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'none', letterSpacing: 1 }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--green)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
-            >SUBMIT</Link>
+            <Link to="/dashboard" className="nav-link">DASHBOARD</Link>
+            <Link to="/watchlist" className="nav-link">WATCHLIST</Link>
+            <Link to="/submit" className="nav-link">SUBMIT</Link>
             <Link to="/dashboard" style={{
               padding: '8px 20px', border: '1px solid var(--green)', color: 'var(--green)',
-              fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: 1, borderRadius: 3, textDecoration: 'none',
+              fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: 1, borderRadius: 3, textDecoration: 'none', transition: 'box-shadow 0.15s',
             }}
               onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 20px rgba(0,255,136,0.25)'}
               onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-            >
-              Launch App →
-            </Link>
+            >Launch App →</Link>
           </div>
         </div>
       </nav>
@@ -80,18 +71,14 @@ export default function Home() {
             }}
               onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 32px rgba(0,255,136,0.4)'}
               onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-            >
-              Open Dashboard →
-            </Link>
+            >Open Dashboard →</Link>
             <Link to="/submit" style={{
               display: 'inline-flex', alignItems: 'center', gap: 10,
               padding: '16px 36px', background: 'transparent',
               border: '1px solid var(--border2)', color: 'var(--muted)',
               fontFamily: 'var(--mono)', fontSize: 13, letterSpacing: 1,
               borderRadius: 3, textDecoration: 'none',
-            }}>
-              Submit a collection
-            </Link>
+            }}>Submit a collection</Link>
           </div>
 
           <div className="hero-stats" style={{ display: 'flex', gap: 48, paddingTop: 40, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
@@ -118,13 +105,12 @@ export default function Home() {
             Everything you need<br />to trade smarter
           </h2>
         </div>
-
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
           {[
             { icon: '◈', color: 'var(--green)', title: 'Live Floor & Volume', desc: 'Real-time OpenSea v2 data. Floor price, cumulative volume, 24h change, and momentum calculated automatically for each collection.' },
             { icon: '⚡', color: 'var(--cyan)', title: '15s Live Sniper', desc: 'Real-time listings sorted by price. Automatic detection of items at floor. Direct OpenSea link to buy instantly.' },
-            { icon: '▦', color: 'var(--yellow)', title: 'Score & Ranking', desc: 'Algorithmic scoring based on floor, volume and momentum. Automatic ranking to identify the most dynamic collections.' },
-            { icon: '✓', color: 'var(--green)', title: 'Verified Collections', desc: 'Only collections that contributed to the ecosystem are listed. Each project sends 1 NFT to get featured.' },
+            { icon: '▦', color: 'var(--yellow)', title: 'Score & Ranking', desc: 'Algorithmic scoring based on floor, volume, sales and holder ratio. Automatic ranking to identify the most dynamic collections.' },
+            { icon: '✓', color: 'var(--green)', title: 'Verified Collections', desc: 'Only collections that contributed to the ecosystem are listed. Each project sends 1 NFT to get featured and earn the Verified badge.' },
           ].map(f => (
             <div key={f.title} className="feature-card" style={{ background: 'var(--bg2)', padding: 36 }}>
               <div style={{ fontSize: 28, marginBottom: 20, color: f.color }}>{f.icon}</div>
@@ -149,9 +135,7 @@ export default function Home() {
         }}
           onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 40px rgba(0,255,136,0.4)'}
           onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-        >
-          Open Dashboard →
-        </Link>
+        >Open Dashboard →</Link>
       </div>
 
       {/* FOOTER */}

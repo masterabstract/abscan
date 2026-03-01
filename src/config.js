@@ -1,9 +1,9 @@
 export const COLLECTIONS = [
   { name: "Pengztracted",      slug: "pengztracted-abstract",    chain: "abstract", verified: true },
-  { name: "OCH Genesis Hero",  slug: "genesishero-abstract",     chain: "abstract", verified: true },
-  { name: "Abstract Universe", slug: "abstra-universe-abstract", chain: "abstract", verified: true },
-  { name: "Gigaverse ROMs",    slug: "gigaverse-roms-abstract",  chain: "abstract", verified: true },
-  { name: "Final Bosu",        slug: "finalbosu",                chain: "abstract", verified: true },
+  { name: "OCH Genesis Hero",  slug: "genesishero-abstract",     chain: "abstract", verified: false },
+  { name: "Abstract Universe", slug: "abstra-universe-abstract", chain: "abstract", verified: false },
+  { name: "Gigaverse ROMs",    slug: "gigaverse-roms-abstract",  chain: "abstract", verified: false },
+  { name: "Final Bosu",        slug: "finalbosu",                chain: "abstract", verified: false },
 ];
 
 export const API_BASE = "/api";

@@ -24,9 +24,15 @@ module.exports = async function handler(req, res) {
     const statsData = await statsRes.json();
     const collectionData = collectionRes.ok ? await collectionRes.json() : {};
 
+    const totalSupply = statsData.total?.total_supply || collectionData.total_supply || 0;
+
     res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=30');
     return res.status(200).json({
       ...statsData,
+      total: {
+        ...statsData.total,
+        total_supply: totalSupply,
+      },
       image_url: collectionData.image_url || null,
       banner_image_url: collectionData.banner_image_url || null,
       collection_name: collectionData.name || null,

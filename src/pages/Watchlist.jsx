@@ -71,19 +71,13 @@ export default function Watchlist() {
   return (
     <Layout title="Watchlist">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
-        <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, fontWeight: 800, color: 'var(--white)', letterSpacing: '-1px' }}>
-          My Watchlist
-        </h1>
+        <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, fontWeight: 800, color: 'var(--white)', letterSpacing: '-1px' }}>My Watchlist</h1>
         {watchlist.length > 0 && (
           <button onClick={loadAll} disabled={loading} style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '10px 20px', background: 'transparent',
-            border: '1px solid var(--border2)', color: 'var(--muted)',
-            fontFamily: 'var(--mono)', fontSize: 12, cursor: loading ? 'not-allowed' : 'pointer',
-            borderRadius: 3, letterSpacing: 1,
-          }}>
-            ↺ Refresh
-          </button>
+            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px',
+            background: 'transparent', border: '1px solid var(--border2)', color: 'var(--muted)',
+            fontFamily: 'var(--mono)', fontSize: 12, cursor: loading ? 'not-allowed' : 'pointer', borderRadius: 3, letterSpacing: 1,
+          }}>↺ Refresh</button>
         )}
       </div>
 
@@ -92,13 +86,10 @@ export default function Watchlist() {
           <div style={{ fontSize: 32, marginBottom: 16 }}>◈</div>
           <div style={{ color: 'var(--muted)', fontSize: 14, marginBottom: 24 }}>Your watchlist is empty</div>
           <Link to="/dashboard" style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            padding: '10px 24px', background: 'transparent',
-            border: '1px solid var(--green)', color: 'var(--green)',
+            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 24px',
+            background: 'transparent', border: '1px solid var(--green)', color: 'var(--green)',
             fontFamily: 'var(--mono)', fontSize: 12, borderRadius: 3, textDecoration: 'none',
-          }}>
-            Browse collections →
-          </Link>
+          }}>Browse collections →</Link>
         </div>
       ) : (
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
@@ -122,50 +113,41 @@ export default function Watchlist() {
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 36, height: 36, borderRadius: 4, overflow: 'hidden', background: 'var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {d.image_url ? (
-                            <img src={d.image_url} alt={d.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <span style={{ fontSize: 14, color: 'var(--border2)' }}>◈</span>
-                          )}
+                          {d.image_url ? <img src={d.image_url} alt={d.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 14, color: 'var(--border2)' }}>◈</span>}
                         </div>
-                        <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 15, color: 'var(--white)', textDecoration: 'none' }}>
-                          {d.name}
-                        </Link>
+                        <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 15, color: 'var(--white)', textDecoration: 'none' }}>{d.name}</Link>
                       </div>
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                       {d.ok && d.floor > 0 ? (
                         <div>
-                          <span style={{ color: 'var(--white)' }}>{d.floor.toFixed(4)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span>
+                          <span style={{ color: 'var(--white)', fontFamily: 'var(--mono)' }}>{d.floor.toFixed(4)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span>
                           <div style={{ marginTop: 2 }}><Change value={d.volumeChange} /></div>
                         </div>
                       ) : '—'}
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
-                      {d.ok ? <><span style={{ color: 'var(--text)' }}>{d.volume24h.toFixed(2)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span></> : '—'}
+                      {d.ok ? <><span style={{ color: 'var(--text)', fontFamily: 'var(--mono)' }}>{d.volume24h.toFixed(2)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span></> : '—'}
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                      <span style={{ color: 'var(--text)' }}>{d.ok ? d.sales24h : '—'}</span>
+                      <span style={{ color: 'var(--text)', fontFamily: 'var(--mono)' }}>{d.ok ? d.sales24h : '—'}</span>
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', minWidth: 140 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${(d.score/maxScore*100).toFixed(1)}%`, background: getScoreColor(d.score, maxScore), borderRadius: 2 }} />
                         </div>
-                        <span style={{ minWidth: 48, color: getScoreColor(d.score, maxScore), fontWeight: 700 }}>{d.score}</span>
+                        <span style={{ minWidth: 48, color: getScoreColor(d.score, maxScore), fontWeight: 700, fontFamily: 'var(--mono)' }}>{d.score}</span>
                       </div>
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
                       <button onClick={() => remove(d.slug)} style={{
-                        padding: '6px 14px', background: 'transparent',
-                        border: '1px solid var(--border2)', color: 'var(--muted)',
-                        fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, cursor: 'pointer',
+                        padding: '6px 14px', background: 'transparent', border: '1px solid var(--border2)',
+                        color: 'var(--muted)', fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, cursor: 'pointer',
                       }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = '#ff4d4d'; e.currentTarget.style.color = '#ff4d4d'; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)'; }}
-                      >
-                        Remove ✕
-                      </button>
+                      >Remove ✕</button>
                     </td>
                   </tr>
                 ))}

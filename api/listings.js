@@ -18,25 +18,19 @@ module.exports = async function handler(req, res) {
     if (!r.ok) return res.status(r.status).json({ error: await r.text() });
     const data = await r.json();
 
-    // Enrichir avec les images NFT
     const listings = data.listings || [];
     const enriched = await Promise.all(listings.map(async l => {
       try {
         const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria;
         const contractAddress = l.protocol_data?.parameters?.offer?.[0]?.token;
         if (!tokenId || !contractAddress) return l;
-
         const nftRes = await fetch(
           `https://api.opensea.io/api/v2/chain/abstract/contract/${contractAddress}/nfts/${tokenId}`,
           { headers: { 'X-API-KEY': API_KEY, 'Accept': 'application/json' } }
         );
         if (!nftRes.ok) return l;
         const nftData = await nftRes.json();
-        return {
-          ...l,
-          image_url: nftData.nft?.image_url || null,
-          name: nftData.nft?.name || null,
-        };
+        return { ...l, image_url: nftData.nft?.image_url || null, name: nftData.nft?.name || null };
       } catch { return l; }
     }));
 

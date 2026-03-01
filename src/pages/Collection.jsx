@@ -10,38 +10,17 @@ Chart.register(...registerables);
 function Tooltip({ text }) {
   const [rect, setRect] = useState(null);
   const ref = useRef(null);
-
-  function show() {
-    if (!ref.current) return;
-    setRect(ref.current.getBoundingClientRect());
-  }
-
+  function show() { if (ref.current) setRect(ref.current.getBoundingClientRect()); }
   function hide() { setRect(null); }
-
   return (
     <>
-      <span
-        ref={ref}
-        onMouseEnter={show}
-        onMouseLeave={hide}
-        style={{
-          width: 15, height: 15, borderRadius: '50%',
-          border: '1px solid var(--border2)',
-          color: 'var(--muted)', fontSize: 9,
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'help', userSelect: 'none', marginLeft: 6, flexShrink: 0,
-        }}
-      >?</span>
+      <span ref={ref} onMouseEnter={show} onMouseLeave={hide} style={{
+        width: 15, height: 15, borderRadius: '50%', border: '1px solid var(--border2)',
+        color: 'var(--muted)', fontSize: 9, display: 'inline-flex', alignItems: 'center',
+        justifyContent: 'center', cursor: 'help', userSelect: 'none', marginLeft: 6, flexShrink: 0,
+      }}>?</span>
       {rect && createPortal(
-        <div
-          className="tooltip-portal"
-          style={{
-            top: rect.top + window.scrollY - 8,
-            left: rect.left + rect.width / 2,
-            transform: 'translate(-50%, -100%)',
-            position: 'absolute',
-          }}
-        >
+        <div className="tooltip-portal" style={{ top: rect.top + window.scrollY - 8, left: rect.left + rect.width / 2, transform: 'translate(-50%, -100%)' }}>
           {text}
         </div>,
         document.body
@@ -73,12 +52,9 @@ export default function Collection() {
 
   function toggleWatch() {
     const saved = JSON.parse(localStorage.getItem('abstrack_watchlist') || '[]');
-    let updated;
-    if (watched) {
-      updated = saved.filter(c => c.slug !== slug);
-    } else {
-      updated = [...saved, { name, slug, chain: 'abstract' }];
-    }
+    const updated = watched
+      ? saved.filter(c => c.slug !== slug)
+      : [...saved, { name, slug, chain: 'abstract' }];
     localStorage.setItem('abstrack_watchlist', JSON.stringify(updated));
     setWatched(!watched);
   }
@@ -97,11 +73,7 @@ export default function Collection() {
       const volume24h = day.volume || 0;
       const sales24h = day.sales || 0;
       setFloor(f);
-      setStats({
-        floor: f, volume: v, volume24h, sales24h,
-        numOwners, totalSupply,
-        score: computeScore(f, volume24h, sales24h, totalSupply, numOwners),
-      });
+      setStats({ floor: f, volume: v, volume24h, sales24h, numOwners, totalSupply, score: computeScore(f, volume24h, sales24h, totalSupply, numOwners) });
       renderChart(f);
     } catch(e) { console.error(e); }
     setLoadingStats(false);
@@ -160,41 +132,17 @@ export default function Collection() {
   }, [slug]);
 
   const statCards = [
-    {
-      label: 'Floor Price',
-      value: loadingStats ? '—' : stats?.floor.toFixed(4),
-      sub: 'ETH',
-      color: 'var(--white)',
-      tooltip: 'The lowest listed price in this collection on OpenSea. Updated every 60s via OpenSea v2 API.',
-    },
-    {
-      label: '24h Volume',
-      value: loadingStats ? '—' : stats?.volume24h.toFixed(2),
-      sub: 'ETH',
-      color: 'var(--cyan)',
-      tooltip: 'Total ETH traded in the last 24 hours. Source: OpenSea v2 stats API, one_day interval.',
-    },
-    {
-      label: '24h Sales',
-      value: loadingStats ? '—' : stats?.sales24h,
-      sub: 'transactions',
-      color: 'var(--yellow)',
-      tooltip: 'Number of completed sales in the last 24h. High count = strong liquidity and active trading.',
-    },
+    { label: 'Floor Price', value: loadingStats ? '—' : stats?.floor.toFixed(4), sub: 'ETH', color: 'var(--white)', tooltip: 'The lowest listed price in this collection on OpenSea. Updated every 60s via OpenSea v2 API.' },
+    { label: '24h Volume', value: loadingStats ? '—' : stats?.volume24h.toFixed(2), sub: 'ETH', color: 'var(--cyan)', tooltip: 'Total ETH traded in the last 24 hours. Source: OpenSea v2 stats API, one_day interval.' },
+    { label: '24h Sales', value: loadingStats ? '—' : stats?.sales24h, sub: 'transactions', color: 'var(--yellow)', tooltip: 'Number of completed sales in the last 24h. High count = strong liquidity and active trading.' },
     {
       label: 'Holders',
       value: loadingStats ? '—' : stats?.numOwners?.toLocaleString(),
-      sub: `of ${stats?.totalSupply?.toLocaleString() || '—'}`,
+      sub: loadingStats ? '—' : `of ${stats?.totalSupply > 0 ? stats.totalSupply.toLocaleString() : '—'}`,
       color: 'var(--muted)',
       tooltip: 'Unique wallets holding at least 1 NFT vs total supply. High ratio = good distribution.',
     },
-    {
-      label: 'Score',
-      value: loadingStats ? '—' : stats?.score,
-      sub: 'algorithmic',
-      color: 'var(--green)',
-      tooltip: 'Score = Floor×40% + 24h Volume×30% + 24h Sales×20% + Holders Ratio×10%. Higher = more active and valuable.',
-    },
+    { label: 'Score', value: loadingStats ? '—' : stats?.score, sub: 'algorithmic', color: 'var(--green)', tooltip: 'Score = Floor×40% + 24h Volume×30% + 24h Sales×20% + Holders Ratio×10%. Higher = more active and valuable.' },
   ];
 
   return (
@@ -210,12 +158,10 @@ export default function Collection() {
           </div>
         </div>
         <button onClick={toggleWatch} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '10px 20px', background: 'transparent',
-          border: `1px solid ${watched ? 'var(--cyan)' : 'var(--border2)'}`,
-          color: watched ? 'var(--cyan)' : 'var(--muted)',
-          fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer',
-          borderRadius: 3, letterSpacing: 1, transition: 'all 0.15s',
+          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px',
+          background: 'transparent', border: `1px solid ${watched ? 'var(--cyan)' : 'var(--border2)'}`,
+          color: watched ? 'var(--cyan)' : 'var(--muted)', fontFamily: 'var(--mono)',
+          fontSize: 12, cursor: 'pointer', borderRadius: 3, letterSpacing: 1, transition: 'all 0.15s',
         }}>
           {watched ? '★ Watchlisted' : '☆ Add to Watchlist'}
         </button>
@@ -239,6 +185,7 @@ export default function Collection() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase' }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
             FLOOR TREND — 7 DAYS
+            <Tooltip text="This chart shows the estimated floor price evolution over the last 7 days. Data is extrapolated from the current floor price as a directional indicator. Real historical data requires a premium API." />
           </div>
           <div style={{ padding: 20, height: 260 }}>
             <canvas ref={chartRef} />
@@ -255,39 +202,31 @@ export default function Collection() {
             {listings.length === 0 ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>No active listings</div>
             ) : listings.slice(0, 20).map((item, i) => {
-              const isDeal = floor > 0 && item.price <= floor * 1.05;
-              const pct = floor > 0 ? ((item.price - floor) / floor * 100).toFixed(1) : null;
+              const isFloor = i === 0;
+              const pct = floor > 0 && !isFloor ? ((item.price - floor) / floor * 100).toFixed(1) : null;
               const openseaUrl = item.contractAddress
                 ? `https://opensea.io/assets/abstract/${item.contractAddress}/${item.tokenId}`
                 : `https://opensea.io/collection/${slug}`;
               return (
                 <a key={i} href={openseaUrl} target="_blank" rel="noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${isDeal ? 'var(--green)' : 'var(--border2)'}`, textDecoration: 'none', transition: 'background 0.15s' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${isFloor ? 'var(--green)' : 'var(--border2)'}`, textDecoration: 'none', transition: 'background 0.15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
                   <div style={{ width: 44, height: 44, borderRadius: 4, overflow: 'hidden', background: 'var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {item.image_url ? (
-                      <img src={item.image_url} alt={item.name || item.tokenId} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <span style={{ fontSize: 18, color: 'var(--border2)' }}>◈</span>
-                    )}
+                    {item.image_url ? <img src={item.image_url} alt={item.name || item.tokenId} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 18, color: 'var(--border2)' }}>◈</span>}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {item.name || `#${item.tokenId}`}
                     </div>
-                    {pct !== null && (
-                      <div style={{ fontSize: 10, color: isDeal ? 'var(--green)' : 'var(--muted)', marginTop: 2 }}>
-                        {isDeal ? `◉ FLOOR +${pct}%` : `+${pct}% vs floor`}
-                      </div>
-                    )}
+                    <div style={{ fontSize: 10, marginTop: 2, color: isFloor ? 'var(--green)' : 'var(--muted)' }}>
+                      {isFloor ? '◉ FLOOR' : `+${pct}% vs floor`}
+                    </div>
                     <div style={{ fontSize: 9, color: 'var(--dim)', marginTop: 2 }}>View on OpenSea ↗</div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 13, color: isDeal ? 'var(--green)' : 'var(--white)' }}>
-                      {item.price.toFixed(4)}
-                    </div>
+                    <div style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: 13, color: isFloor ? 'var(--green)' : 'var(--white)' }}>{item.price.toFixed(4)}</div>
                     <div style={{ fontSize: 10, color: 'var(--dim)' }}>ETH</div>
                   </div>
                 </a>

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { COLLECTIONS, API_BASE, computeScore } from '../config';
@@ -21,6 +22,28 @@ function Change({ value }) {
   );
 }
 
+function Tooltip({ text }) {
+  const [rect, setRect] = useState(null);
+  const ref = useRef(null);
+  function show() { if (ref.current) setRect(ref.current.getBoundingClientRect()); }
+  function hide() { setRect(null); }
+  return (
+    <>
+      <span ref={ref} onMouseEnter={show} onMouseLeave={hide} style={{
+        width: 15, height: 15, borderRadius: '50%', border: '1px solid var(--border2)',
+        color: 'var(--muted)', fontSize: 9, display: 'inline-flex', alignItems: 'center',
+        justifyContent: 'center', cursor: 'help', userSelect: 'none', marginLeft: 6, flexShrink: 0,
+      }}>?</span>
+      {rect && createPortal(
+        <div className="tooltip-portal" style={{ top: rect.top + window.scrollY - 8, left: rect.left + rect.width / 2, transform: 'translate(-50%, -100%)' }}>
+          {text}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 function WatchBtn({ collection }) {
   const [watched, setWatched] = useState(false);
   useEffect(() => {
@@ -30,12 +53,9 @@ function WatchBtn({ collection }) {
 
   function toggle() {
     const saved = JSON.parse(localStorage.getItem('abstrack_watchlist') || '[]');
-    let updated;
-    if (watched) {
-      updated = saved.filter(c => c.slug !== collection.slug);
-    } else {
-      updated = [...saved, { name: collection.name, slug: collection.slug, chain: collection.chain }];
-    }
+    const updated = watched
+      ? saved.filter(c => c.slug !== collection.slug)
+      : [...saved, { name: collection.name, slug: collection.slug, chain: collection.chain }];
     localStorage.setItem('abstrack_watchlist', JSON.stringify(updated));
     setWatched(!watched);
   }
@@ -45,14 +65,11 @@ function WatchBtn({ collection }) {
       padding: '6px 10px', background: 'transparent',
       border: `1px solid ${watched ? 'var(--cyan)' : 'var(--border2)'}`,
       color: watched ? 'var(--cyan)' : 'var(--muted)',
-      fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, cursor: 'pointer', transition: 'all 0.15s',
+      fontSize: 11, borderRadius: 3, cursor: 'pointer', transition: 'all 0.15s',
     }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--cyan)'; e.currentTarget.style.color = 'var(--cyan)'; }}
       onMouseLeave={e => { if (!watched) { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)'; } }}
-      title={watched ? 'Remove from watchlist' : 'Add to watchlist'}
-    >
-      {watched ? '★' : '☆'}
-    </button>
+    >{watched ? '★' : '☆'}</button>
   );
 }
 
@@ -72,15 +89,14 @@ export default function Dashboard() {
     const volume24h = day.volume || 0;
     const sales24h = day.sales || 0;
     const volumeChange = day.volume_change ? day.volume_change * 100 : null;
-    const score = computeScore(floor, volume24h, sales24h, totalSupply, numOwners);
-    return { ...c, floor, volume24h, sales24h, volumeChange, floorChange: volumeChange, numOwners, totalSupply, score, image_url: d.image_url || null, ok: true };
+    return { ...c, floor, volume24h, sales24h, volumeChange, floorChange: volumeChange, numOwners, totalSupply, score: computeScore(floor, volume24h, sales24h, totalSupply, numOwners), image_url: d.image_url || null, ok: true };
   }
 
   async function loadAll() {
     setLoading(true);
     const results = await Promise.allSettled(COLLECTIONS.map(fetchCollection));
     const rows = results.map((r, i) =>
-      r.status === 'fulfilled' ? r.value : { ...COLLECTIONS[i], floor: 0, volume24h: 0, sales24h: 0, volumeChange: null, floorChange: null, score: 0, image_url: null, ok: false }
+      r.status === 'fulfilled' ? r.value : { ...COLLECTIONS[i], floor: 0, volume24h: 0, sales24h: 0, volumeChange: null, score: 0, image_url: null, ok: false }
     );
     rows.sort((a, b) => b.score - a.score);
     setData(rows);
@@ -95,36 +111,35 @@ export default function Dashboard() {
   const avgFloor = okData.length ? okData.reduce((s, d) => s + d.floor, 0) / okData.length : 0;
   const maxScore = Math.max(...data.map(d => d.score), 1);
 
+  const globalStats = [
+    { label: '24h Volume', value: loading ? '—' : totalVol24h.toFixed(2), sub: 'ETH today', color: 'var(--white)', tooltip: null },
+    { label: 'Avg Floor', value: loading ? '—' : avgFloor.toFixed(4), sub: 'ETH', color: 'var(--cyan)', tooltip: 'Average floor price across all tracked collections. Calculated as the sum of all floor prices divided by the number of active collections. A useful gauge of the overall market level on Abstract Network.' },
+    { label: 'Collections', value: COLLECTIONS.length, sub: 'verified', color: 'var(--yellow)', tooltip: null },
+    { label: 'Top Scorer', value: loading || !data[0] ? '—' : data[0].name, sub: data[0] ? `Score: ${data[0].score}` : '—', color: 'var(--green)', tooltip: null },
+  ];
+
   return (
     <Layout title="Dashboard">
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, fontWeight: 800, color: 'var(--white)', letterSpacing: '-1px' }}>
-            Collection Ranking
-          </h1>
+          <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, fontWeight: 800, color: 'var(--white)', letterSpacing: '-1px' }}>Collection Ranking</h1>
           {lastUpdate && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Last update: {lastUpdate}</div>}
         </div>
         <button onClick={loadAll} disabled={loading} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          padding: '10px 20px', background: 'transparent',
-          border: '1px solid var(--border2)', color: 'var(--muted)',
-          fontFamily: 'var(--mono)', fontSize: 12, cursor: loading ? 'not-allowed' : 'pointer',
-          borderRadius: 3, letterSpacing: 1,
-        }}>
-          ↺ Refresh
-        </button>
+          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 20px',
+          background: 'transparent', border: '1px solid var(--border2)', color: 'var(--muted)',
+          fontFamily: 'var(--mono)', fontSize: 12, cursor: loading ? 'not-allowed' : 'pointer', borderRadius: 3, letterSpacing: 1,
+        }}>↺ Refresh</button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 24 }}>
-        {[
-          { label: '24h Volume', value: loading ? '—' : totalVol24h.toFixed(2), sub: 'ETH today', color: 'var(--white)' },
-          { label: 'Avg Floor', value: loading ? '—' : avgFloor.toFixed(4), sub: 'ETH', color: 'var(--cyan)' },
-          { label: 'Collections', value: COLLECTIONS.length, sub: 'verified', color: 'var(--yellow)' },
-          { label: 'Top Scorer', value: loading || !data[0] ? '—' : data[0].name, sub: data[0] ? `Score: ${data[0].score}` : '—', color: 'var(--green)' },
-        ].map(s => (
+        {globalStats.map(s => (
           <div key={s.label} style={{ background: 'var(--bg2)', padding: 20 }}>
-            <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: 24, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+            <div style={{ display: 'flex', alignItems: 'center', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>
+              {s.label}
+              {s.tooltip && <Tooltip text={s.tooltip} />}
+            </div>
+            <div style={{ fontFamily: 'var(--mono)', fontSize: 24, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</div>
             <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 4 }}>{s.sub}</div>
           </div>
         ))}
@@ -135,11 +150,8 @@ export default function Dashboard() {
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
           RANKING — ALGORITHMIC SCORE
         </div>
-
         {loading ? (
-          <div style={{ padding: 40, display: 'flex', justifyContent: 'center', color: 'var(--muted)', fontSize: 12 }}>
-            Loading collections...
-          </div>
+          <div style={{ padding: 40, display: 'flex', justifyContent: 'center', color: 'var(--muted)', fontSize: 12 }}>Loading collections...</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -160,20 +172,12 @@ export default function Dashboard() {
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ width: 36, height: 36, borderRadius: 4, overflow: 'hidden', background: 'var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          {d.image_url ? (
-                            <img src={d.image_url} alt={d.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <span style={{ fontSize: 14, color: 'var(--border2)' }}>◈</span>
-                          )}
+                          {d.image_url ? <img src={d.image_url} alt={d.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 14, color: 'var(--border2)' }}>◈</span>}
                         </div>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 15, color: 'var(--white)', textDecoration: 'none' }}>
-                              {d.name}
-                            </Link>
-                            {d.verified && (
-                              <span style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', borderRadius: 3, padding: '2px 6px', fontSize: 9, color: 'var(--green)', letterSpacing: 1 }}>✓</span>
-                            )}
+                            <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 15, color: 'var(--white)', textDecoration: 'none' }}>{d.name}</Link>
+                            {d.verified && <span style={{ background: 'rgba(0,255,136,0.1)', border: '1px solid rgba(0,255,136,0.3)', borderRadius: 3, padding: '2px 6px', fontSize: 9, color: 'var(--green)', letterSpacing: 1 }}>✓ VERIFIED</span>}
                           </div>
                           <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{d.chain}</div>
                         </div>
@@ -182,7 +186,7 @@ export default function Dashboard() {
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                       {d.ok && d.floor > 0 ? (
                         <div>
-                          <span style={{ color: 'var(--white)' }}>{d.floor.toFixed(4)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span>
+                          <span style={{ color: 'var(--white)', fontFamily: 'var(--mono)' }}>{d.floor.toFixed(4)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span>
                           <div style={{ marginTop: 2 }}><Change value={d.floorChange} /></div>
                         </div>
                       ) : '—'}
@@ -190,39 +194,36 @@ export default function Dashboard() {
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                       {d.ok ? (
                         <div>
-                          <span style={{ color: 'var(--text)' }}>{d.volume24h.toFixed(2)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span>
+                          <span style={{ color: 'var(--text)', fontFamily: 'var(--mono)' }}>{d.volume24h.toFixed(2)}</span> <span style={{ color: 'var(--dim)' }}>ETH</span>
                           {d.volumeChange !== null && <div style={{ marginTop: 2 }}><Change value={d.volumeChange} /></div>}
                         </div>
                       ) : '—'}
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                      <span style={{ color: 'var(--text)' }}>{d.ok ? d.sales24h : '—'}</span>
+                      <span style={{ color: 'var(--text)', fontFamily: 'var(--mono)' }}>{d.ok ? d.sales24h : '—'}</span>
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-                      <span style={{ color: 'var(--text)' }}>{d.ok && d.numOwners > 0 ? d.numOwners.toLocaleString() : '—'}</span>
+                      <span style={{ color: 'var(--text)', fontFamily: 'var(--mono)' }}>{d.ok && d.numOwners > 0 ? d.numOwners.toLocaleString() : '—'}</span>
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', minWidth: 160 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ flex: 1, height: 3, background: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
                           <div style={{ height: '100%', width: `${(d.score/maxScore*100).toFixed(1)}%`, background: getScoreColor(d.score, maxScore), borderRadius: 2, transition: 'width 1s ease' }} />
                         </div>
-                        <span style={{ minWidth: 48, color: getScoreColor(d.score, maxScore), fontWeight: 700 }}>{d.score}</span>
+                        <span style={{ minWidth: 48, color: getScoreColor(d.score, maxScore), fontWeight: 700, fontFamily: 'var(--mono)' }}>{d.score}</span>
                       </div>
                     </td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <WatchBtn collection={d} />
                         <Link to={`/collection/${d.slug}?name=${encodeURIComponent(d.name)}`} style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 6,
-                          padding: '6px 14px', background: 'transparent',
-                          border: '1px solid var(--border2)', color: 'var(--muted)',
+                          display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+                          background: 'transparent', border: '1px solid var(--border2)', color: 'var(--muted)',
                           fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, textDecoration: 'none',
                         }}
                           onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--green)'; e.currentTarget.style.color = 'var(--green)'; }}
                           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)'; }}
-                        >
-                          Analyze →
-                        </Link>
+                        >Analyze →</Link>
                       </div>
                     </td>
                   </tr>
