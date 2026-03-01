@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 export default function Layout({ children, title }) {
   return (
@@ -19,12 +19,25 @@ export default function Layout({ children, title }) {
           }}>
             Abst<span style={{ color: 'var(--green)' }}>Scan</span>
           </Link>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            <Link to="/" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'none', letterSpacing: 1 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--white)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+            >
+              DASHBOARD
+            </Link>
+            <Link to="/submit" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'none', letterSpacing: 1 }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--green)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+            >
+              + SUBMIT
+            </Link>
+          </div>
+
           <span style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase' }}>
             {title || 'Abstract NFT Analytics'}
           </span>
-          <Link to="/connect" style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'none' }}>
-            Connect →
-          </Link>
         </div>
       </nav>
       <main style={{ paddingTop: 65, maxWidth: 1280, margin: '0 auto', padding: '80px 24px 60px' }}>
