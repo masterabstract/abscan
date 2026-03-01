@@ -73,8 +73,15 @@ export default function Collection() {
       const r = await fetch(`${API_BASE}/listings?slug=${slug}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const d = await r.json();
-      setListings(d.listings || []);
-      setSniperStatus(`${new Date().toLocaleTimeString()} — ${(d.listings||[]).length} listings`);
+      const items = (d.listings || []).map(l => {
+        const price = parseFloat(l.price?.current?.value || 0) / 1e18;
+        const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria || '—';
+        const contractAddress = l.protocol_data?.parameters?.offer?.[0]?.token || '';
+        return { price, tokenId, contractAddress };
+      });
+      items.sort((a, b) => a.price - b.price);
+      setListings(items);
+      setSniperStatus(`${new Date().toLocaleTimeString()} — ${items.length} listings`);
     } catch(e) { setSniperStatus(`Erreur — ${e.message}`); }
   }
 
@@ -93,7 +100,12 @@ export default function Collection() {
       <div style={{ marginBottom: 28 }}>
         <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>Collection Analytics</div>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, fontWeight: 800, color: 'var(--white)', letterSpacing: '-1px' }}>{name}</h1>
-        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>opensea.io/collection/{slug}</div>
+        <div style={{ fontSize: 11, marginTop: 6 }}>
+          <a href={`https://opensea.io/collection/${slug}`} target="_blank" rel="noreferrer"
+            style={{ color: 'var(--cyan)', textDecoration: 'none' }}>
+            opensea.io/collection/{slug} ↗
+          </a>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 24 }}>
@@ -128,37 +140,42 @@ export default function Collection() {
             SNIPER LIVE
             <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--dim)' }}>{sniperStatus}</span>
           </div>
-          <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+          <div style={{ maxHeight: 380, overflowY: 'auto' }}>
             {listings.length === 0 ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>Aucun listing actif</div>
-            ) : listings.slice(0, 20).map((l, i) => {
-              const price = parseFloat(l.price?.current?.value || 0) / 1e18;
-              const isDeal = floor > 0 && price <= floor * 1.02;
-              const pct = floor > 0 ? ((price - floor) / floor * 100).toFixed(1) : null;
-              const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria
-                || l.taker_asset_bundle?.assets?.[0]?.token_id
-                || l.maker_asset_bundle?.assets?.[0]?.token_id
-                || l.order_hash?.slice(0, 8)
-                || '—';
+            ) : listings.slice(0, 20).map((item, i) => {
+              const isFloor = floor > 0 && item.price <= floor * 1.05;
+              const pct = floor > 0 ? ((item.price - floor) / floor * 100).toFixed(1) : null;
+              const openseaUrl = item.contractAddress
+                ? `https://opensea.io/assets/abstract/${item.contractAddress}/${item.tokenId}`
+                : `https://opensea.io/collection/${slug}`;
               return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${isDeal ? 'var(--green)' : 'var(--border2)'}` }}>
+                <a key={i} href={openseaUrl} target="_blank" rel="noreferrer"
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${isFloor ? 'var(--green)' : 'var(--border2)'}`, textDecoration: 'none', transition: 'background 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
                   <div>
-                    <div style={{ fontSize: 12, color: 'var(--text)' }}>#{tokenId}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text)' }}>#{item.tokenId}</div>
                     {pct !== null && (
-                      <div style={{ fontSize: 10, color: parseFloat(pct) <= 0 ? 'var(--green)' : 'var(--muted)', marginTop: 2 }}>
-                        {parseFloat(pct) <= 0 ? `▼ ${Math.abs(pct)}% sous floor` : `+${pct}% vs floor`}
+                      <div style={{ fontSize: 10, color: isFloor ? 'var(--green)' : 'var(--muted)', marginTop: 2 }}>
+                        {isFloor ? `◉ FLOOR (+${pct}%)` : `+${pct}% vs floor`}
                       </div>
                     )}
+                    <div style={{ fontSize: 9, color: 'var(--dim)', marginTop: 2 }}>Voir sur OpenSea ↗</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: isDeal ? 'var(--green)' : 'var(--white)' }}>{price.toFixed(4)} ETH</div>
-                    {isDeal && <div style={{ fontSize: 9, color: 'var(--green)', letterSpacing: 1 }}>◉ DEAL</div>}
+                    <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: isFloor ? 'var(--green)' : 'var(--white)' }}>
+                      {item.price.toFixed(4)} ETH
+                    </div>
                   </div>
-                </div>
+                </a>
               );
             })}
           </div>
-          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', fontSize: 10, color: 'var(--dim)' }}>↻ Refresh automatique toutes les 15s</div>
+          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', fontSize: 10, color: 'var(--dim)' }}>
+            ↻ Refresh 15s · trié par prix croissant
+          </div>
         </div>
       </div>
     </Layout>
