@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useAccount } from 'wagmi';
 import { Chart, registerables } from 'chart.js';
 import Layout from '../components/Layout';
 import { API_BASE, computeScore } from '../config';
@@ -10,6 +11,7 @@ export default function Collection() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
   const name = searchParams.get('name') || slug;
+  const { isConnected } = useAccount();
   const navigate = useNavigate();
 
   const [stats, setStats] = useState(null);
@@ -23,8 +25,8 @@ export default function Collection() {
   const sniperInterval = useRef(null);
 
   useEffect(() => {
-    if (sessionStorage.getItem('connected') !== 'true') navigate('/connect');
-  }, [navigate]);
+    if (!isConnected) navigate('/connect');
+  }, [isConnected, navigate]);
 
   async function loadStats() {
     setLoadingStats(true);
@@ -84,6 +86,7 @@ export default function Collection() {
   }
 
   useEffect(() => {
+    if (!isConnected) return;
     loadStats();
     loadSniper();
     sniperInterval.current = setInterval(loadSniper, 15000);
@@ -91,7 +94,7 @@ export default function Collection() {
       clearInterval(sniperInterval.current);
       if (chartInstance.current) chartInstance.current.destroy();
     };
-  }, [slug]);
+  }, [slug, isConnected]);
 
   return (
     <Layout title="Collection Analytics">
@@ -101,7 +104,6 @@ export default function Collection() {
         <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>opensea.io/collection/{slug}</div>
       </div>
 
-      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 24 }}>
         {[
           { label: 'Floor Price', value: loadingStats ? '—' : stats?.floor.toFixed(4), sub: 'ETH', color: 'var(--white)' },
@@ -117,7 +119,6 @@ export default function Collection() {
         ))}
       </div>
 
-      {/* Chart + Sniper */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase' }}>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { useAccount } from 'wagmi';
 import Layout from '../components/Layout';
 import { COLLECTIONS, API_BASE, computeScore } from '../config';
 
@@ -13,15 +14,14 @@ function getScoreColor(score, max) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { isConnected } = useAccount();
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState(null);
 
   useEffect(() => {
-    if (sessionStorage.getItem('connected') !== 'true') {
-      navigate('/connect');
-    }
-  }, [navigate]);
+    if (!isConnected) navigate('/connect');
+  }, [isConnected, navigate]);
 
   async function fetchCollection(c) {
     const r = await fetch(`${API_BASE}/stats?slug=${c.slug}`);
@@ -44,7 +44,9 @@ export default function Dashboard() {
     setLoading(false);
   }
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    if (isConnected) loadAll();
+  }, [isConnected]);
 
   const okData = data.filter(d => d.ok);
   const totalVol = okData.reduce((s, d) => s + d.volume, 0);
@@ -71,7 +73,6 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Global stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 24 }}>
         {[
           { label: 'Total Volume', value: loading ? '—' : totalVol.toFixed(2), sub: 'ETH cumulé', color: 'var(--white)' },
@@ -87,7 +88,6 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Table */}
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase' }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />

@@ -60,6 +60,10 @@ export default function Connect() {
             </div>
           ))}
         </div>
+
+        <p style={{ fontSize: 10, color: 'var(--dim)', letterSpacing: 1 }}>
+          POWERED BY ABSTRACT GLOBAL WALLET
+        </p>
       </div>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </Layout>
