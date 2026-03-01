@@ -23,7 +23,6 @@ function Change({ value }) {
 
 function WatchBtn({ collection }) {
   const [watched, setWatched] = useState(false);
-
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('abstrack_watchlist') || '[]');
     setWatched(saved.some(c => c.slug === collection.slug));
@@ -46,12 +45,11 @@ function WatchBtn({ collection }) {
       padding: '6px 10px', background: 'transparent',
       border: `1px solid ${watched ? 'var(--cyan)' : 'var(--border2)'}`,
       color: watched ? 'var(--cyan)' : 'var(--muted)',
-      fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, cursor: 'pointer',
-      transition: 'all 0.15s',
+      fontFamily: 'var(--mono)', fontSize: 11, borderRadius: 3, cursor: 'pointer', transition: 'all 0.15s',
     }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--cyan)'; e.currentTarget.style.color = 'var(--cyan)'; }}
       onMouseLeave={e => { if (!watched) { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)'; } }}
-      title={watched ? 'Retirer de la watchlist' : 'Ajouter à la watchlist'}
+      title={watched ? 'Remove from watchlist' : 'Add to watchlist'}
     >
       {watched ? '★' : '☆'}
     </button>
@@ -68,7 +66,6 @@ export default function Dashboard() {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     const floor = d.total?.floor_price || 0;
-    const volume = d.total?.volume || 0;
     const numOwners = d.total?.num_owners || 0;
     const totalSupply = d.total?.total_supply || 0;
     const day = d.intervals?.find(i => i.interval === 'one_day') || {};
@@ -76,14 +73,14 @@ export default function Dashboard() {
     const sales24h = day.sales || 0;
     const volumeChange = day.volume_change ? day.volume_change * 100 : null;
     const score = computeScore(floor, volume24h, sales24h, totalSupply, numOwners);
-    return { ...c, floor, volume, volume24h, sales24h, volumeChange, floorChange: volumeChange, numOwners, totalSupply, score, image_url: d.image_url || null, ok: true };
+    return { ...c, floor, volume24h, sales24h, volumeChange, floorChange: volumeChange, numOwners, totalSupply, score, image_url: d.image_url || null, ok: true };
   }
 
   async function loadAll() {
     setLoading(true);
     const results = await Promise.allSettled(COLLECTIONS.map(fetchCollection));
     const rows = results.map((r, i) =>
-      r.status === 'fulfilled' ? r.value : { ...COLLECTIONS[i], floor: 0, volume: 0, volume24h: 0, sales24h: 0, volumeChange: null, floorChange: null, score: 0, image_url: null, ok: false }
+      r.status === 'fulfilled' ? r.value : { ...COLLECTIONS[i], floor: 0, volume24h: 0, sales24h: 0, volumeChange: null, floorChange: null, score: 0, image_url: null, ok: false }
     );
     rows.sort((a, b) => b.score - a.score);
     setData(rows);
@@ -105,7 +102,7 @@ export default function Dashboard() {
           <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, fontWeight: 800, color: 'var(--white)', letterSpacing: '-1px' }}>
             Collection Ranking
           </h1>
-          {lastUpdate && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Dernière mise à jour : {lastUpdate}</div>}
+          {lastUpdate && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Last update: {lastUpdate}</div>}
         </div>
         <button onClick={loadAll} disabled={loading} style={{
           display: 'inline-flex', alignItems: 'center', gap: 8,
@@ -120,10 +117,10 @@ export default function Dashboard() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 24 }}>
         {[
-          { label: 'Volume 24h', value: loading ? '—' : totalVol24h.toFixed(2), sub: 'ETH today', color: 'var(--white)' },
-          { label: 'Floor Moyen', value: loading ? '—' : avgFloor.toFixed(4), sub: 'ETH', color: 'var(--cyan)' },
-          { label: 'Collections', value: COLLECTIONS.length, sub: 'vérifiées', color: 'var(--yellow)' },
-          { label: 'Top Scorer', value: loading || !data[0] ? '—' : data[0].name, sub: data[0] ? `Score : ${data[0].score}` : '—', color: 'var(--green)' },
+          { label: '24h Volume', value: loading ? '—' : totalVol24h.toFixed(2), sub: 'ETH today', color: 'var(--white)' },
+          { label: 'Avg Floor', value: loading ? '—' : avgFloor.toFixed(4), sub: 'ETH', color: 'var(--cyan)' },
+          { label: 'Collections', value: COLLECTIONS.length, sub: 'verified', color: 'var(--yellow)' },
+          { label: 'Top Scorer', value: loading || !data[0] ? '—' : data[0].name, sub: data[0] ? `Score: ${data[0].score}` : '—', color: 'var(--green)' },
         ].map(s => (
           <div key={s.label} style={{ background: 'var(--bg2)', padding: 20 }}>
             <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</div>
@@ -136,19 +133,19 @@ export default function Dashboard() {
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase' }}>
           <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
-          RANKING — SCORE ALGORITHMIQUE
+          RANKING — ALGORITHMIC SCORE
         </div>
 
         {loading ? (
           <div style={{ padding: 40, display: 'flex', justifyContent: 'center', color: 'var(--muted)', fontSize: 12 }}>
-            Chargement des collections...
+            Loading collections...
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
-                  {['#', 'Collection', 'Floor', 'Vol 24h', 'Sales 24h', 'Holders', 'Score', ''].map(h => (
+                  {['#', 'Collection', 'Floor', '24h Vol', '24h Sales', 'Holders', 'Score', ''].map(h => (
                     <th key={h} style={{ textAlign: 'left', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', padding: '10px 16px', borderBottom: '1px solid var(--border)', fontWeight: 400, whiteSpace: 'nowrap' }}>{h}</th>
                   ))}
                 </tr>
@@ -224,7 +221,7 @@ export default function Dashboard() {
                           onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--green)'; e.currentTarget.style.color = 'var(--green)'; }}
                           onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)'; }}
                         >
-                          Analyser →
+                          Analyze →
                         </Link>
                       </div>
                     </td>

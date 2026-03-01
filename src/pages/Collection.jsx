@@ -6,6 +6,31 @@ import { API_BASE, computeScore } from '../config';
 
 Chart.register(...registerables);
 
+function Tooltip({ text }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', marginLeft: 6 }}>
+      <span
+        onMouseEnter={() => setVisible(true)}
+        onMouseLeave={() => setVisible(false)}
+        style={{ width: 14, height: 14, borderRadius: '50%', border: '1px solid var(--border2)', color: 'var(--muted)', fontSize: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'help', userSelect: 'none' }}
+      >?</span>
+      {visible && (
+        <span style={{
+          position: 'absolute', bottom: '120%', left: '50%', transform: 'translateX(-50%)',
+          background: '#0a0a10', border: '1px solid var(--border)', borderRadius: 4,
+          padding: '10px 14px', fontSize: 11, color: 'var(--muted)', lineHeight: 1.7,
+          width: 240, zIndex: 999, pointerEvents: 'none',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+        }}>
+          {text}
+          <span style={{ position: 'absolute', top: '100%', left: '50%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '5px solid transparent', borderRight: '5px solid transparent', borderTop: '5px solid var(--border)' }} />
+        </span>
+      )}
+    </span>
+  );
+}
+
 export default function Collection() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
@@ -14,7 +39,7 @@ export default function Collection() {
   const [stats, setStats] = useState(null);
   const [listings, setListings] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
-  const [sniperStatus, setSniperStatus] = useState('Initialisation...');
+  const [sniperStatus, setSniperStatus] = useState('Initializing...');
   const [floor, setFloor] = useState(0);
   const [watched, setWatched] = useState(false);
 
@@ -75,7 +100,7 @@ export default function Collection() {
     chartInstance.current = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: ['J-6','J-5','J-4','J-3','J-2','J-1','Maintenant'],
+        labels: ['D-6','D-5','D-4','D-3','D-2','D-1','Now'],
         datasets: [{ label: 'Floor (ETH)', data, borderColor: '#00ff88', borderWidth: 2, backgroundColor: gradient, fill: true, tension: 0.4, pointBackgroundColor: '#00ff88', pointBorderColor: '#050508', pointBorderWidth: 2, pointRadius: 4 }]
       },
       options: {
@@ -103,7 +128,7 @@ export default function Collection() {
       items.sort((a, b) => a.price - b.price);
       setListings(items);
       setSniperStatus(`${new Date().toLocaleTimeString()} — ${items.length} listings`);
-    } catch(e) { setSniperStatus(`Erreur — ${e.message}`); }
+    } catch(e) { setSniperStatus(`Error — ${e.message}`); }
   }
 
   useEffect(() => {
@@ -115,6 +140,44 @@ export default function Collection() {
       if (chartInstance.current) chartInstance.current.destroy();
     };
   }, [slug]);
+
+  const statCards = [
+    {
+      label: 'Floor Price',
+      value: loadingStats ? '—' : stats?.floor.toFixed(4),
+      sub: 'ETH',
+      color: 'var(--white)',
+      tooltip: 'The lowest listed price in this collection on OpenSea. Updated every 60 seconds via OpenSea v2 API.',
+    },
+    {
+      label: '24h Volume',
+      value: loadingStats ? '—' : stats?.volume24h.toFixed(2),
+      sub: 'ETH',
+      color: 'var(--cyan)',
+      tooltip: 'Total ETH traded in this collection over the last 24 hours. Source: OpenSea v2 stats API, one_day interval.',
+    },
+    {
+      label: '24h Sales',
+      value: loadingStats ? '—' : stats?.sales24h,
+      sub: 'transactions',
+      color: 'var(--yellow)',
+      tooltip: 'Number of completed sales in the last 24 hours. High sales count indicates strong liquidity and active trading.',
+    },
+    {
+      label: 'Holders',
+      value: loadingStats ? '—' : stats?.numOwners?.toLocaleString(),
+      sub: `of ${stats?.totalSupply?.toLocaleString() || '—'}`,
+      color: 'var(--muted)',
+      tooltip: 'Number of unique wallet addresses holding at least 1 NFT from this collection vs total supply. A high ratio means good distribution.',
+    },
+    {
+      label: 'Score',
+      value: loadingStats ? '—' : stats?.score,
+      sub: 'algorithmic',
+      color: 'var(--green)',
+      tooltip: 'Composite score = Floor×40% + 24h Volume×30% + 24h Sales×20% + Holders Ratio×10%. Higher means more active and valuable collection.',
+    },
+  ];
 
   return (
     <Layout title="Collection Analytics">
@@ -136,20 +199,17 @@ export default function Collection() {
           fontFamily: 'var(--mono)', fontSize: 12, cursor: 'pointer',
           borderRadius: 3, letterSpacing: 1, transition: 'all 0.15s',
         }}>
-          {watched ? '★ Watchlisté' : '☆ Ajouter à la watchlist'}
+          {watched ? '★ Watchlisted' : '☆ Add to Watchlist'}
         </button>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 24 }}>
-        {[
-          { label: 'Floor Price', value: loadingStats ? '—' : stats?.floor.toFixed(4), sub: 'ETH', color: 'var(--white)' },
-          { label: 'Volume 24h', value: loadingStats ? '—' : stats?.volume24h.toFixed(2), sub: 'ETH', color: 'var(--cyan)' },
-          { label: 'Sales 24h', value: loadingStats ? '—' : stats?.sales24h, sub: 'transactions', color: 'var(--yellow)' },
-          { label: 'Holders', value: loadingStats ? '—' : stats?.numOwners?.toLocaleString(), sub: `sur ${stats?.totalSupply?.toLocaleString() || '—'}`, color: 'var(--muted)' },
-          { label: 'Score', value: loadingStats ? '—' : stats?.score, sub: 'algorithmique', color: 'var(--green)' },
-        ].map(s => (
+        {statCards.map(s => (
           <div key={s.label} style={{ background: 'var(--bg2)', padding: 20 }}>
-            <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</div>
+            <div style={{ display: 'flex', alignItems: 'center', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>
+              {s.label}
+              <Tooltip text={s.tooltip} />
+            </div>
             <div style={{ fontFamily: 'var(--display)', fontSize: 22, fontWeight: 800, color: s.color }}>{s.value || '—'}</div>
             <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 4 }}>{s.sub}</div>
           </div>
@@ -160,7 +220,7 @@ export default function Collection() {
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase' }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
-            FLOOR TREND — 7 JOURS
+            FLOOR TREND — 7 DAYS
           </div>
           <div style={{ padding: 20, height: 260 }}>
             <canvas ref={chartRef} />
@@ -170,12 +230,12 @@ export default function Collection() {
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase' }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--cyan)', boxShadow: '0 0 8px var(--cyan)' }} />
-            SNIPER LIVE
+            LIVE SNIPER
             <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--dim)' }}>{sniperStatus}</span>
           </div>
           <div style={{ maxHeight: 400, overflowY: 'auto' }}>
             {listings.length === 0 ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>Aucun listing actif</div>
+              <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>No active listings</div>
             ) : listings.slice(0, 20).map((item, i) => {
               const isDeal = floor > 0 && item.price <= floor * 1.05;
               const pct = floor > 0 ? ((item.price - floor) / floor * 100).toFixed(1) : null;
@@ -204,7 +264,7 @@ export default function Collection() {
                         {isDeal ? `◉ FLOOR +${pct}%` : `+${pct}% vs floor`}
                       </div>
                     )}
-                    <div style={{ fontSize: 9, color: 'var(--dim)', marginTop: 2 }}>Voir sur OpenSea ↗</div>
+                    <div style={{ fontSize: 9, color: 'var(--dim)', marginTop: 2 }}>View on OpenSea ↗</div>
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 13, color: isDeal ? 'var(--green)' : 'var(--white)' }}>
@@ -217,7 +277,7 @@ export default function Collection() {
             })}
           </div>
           <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)', fontSize: 10, color: 'var(--dim)' }}>
-            ↻ Refresh 15s · trié par prix croissant
+            ↻ Auto-refresh every 15s · sorted by price
           </div>
         </div>
       </div>
