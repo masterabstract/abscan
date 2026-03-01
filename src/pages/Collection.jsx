@@ -29,14 +29,17 @@ export default function Collection() {
       const d = await r.json();
       const f = d.total?.floor_price || 0;
       const v = d.total?.volume || 0;
+      const numOwners = d.total?.num_owners || 0;
+      const totalSupply = d.total?.total_supply || 0;
+      const day = d.intervals?.find(i => i.interval === 'one_day') || {};
+      const volume24h = day.volume || 0;
+      const sales24h = day.sales || 0;
       setFloor(f);
       setStats({
-        floor: f, volume: v,
-        sales: d.total?.sales || 0,
-        numOwners: d.total?.num_owners || 0,
-        totalSupply: d.total?.total_supply || 0,
+        floor: f, volume: v, volume24h, sales24h,
+        numOwners, totalSupply,
         momentum: (v / (f + 0.001)).toFixed(2),
-        score: computeScore(f, v),
+        score: computeScore(f, volume24h, sales24h, totalSupply, numOwners),
       });
       renderChart(f);
     } catch(e) { console.error(e); }
@@ -77,7 +80,11 @@ export default function Collection() {
         const price = parseFloat(l.price?.current?.value || 0) / 1e18;
         const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria || '—';
         const contractAddress = l.protocol_data?.parameters?.offer?.[0]?.token || '';
-        return { price, tokenId, contractAddress };
+        return {
+          price, tokenId, contractAddress,
+          image_url: l.image_url || null,
+          name: l.name || null,
+        };
       });
       items.sort((a, b) => a.price - b.price);
       setListings(items);
@@ -101,29 +108,29 @@ export default function Collection() {
         <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>Collection Analytics</div>
         <h1 style={{ fontFamily: 'var(--display)', fontSize: 28, fontWeight: 800, color: 'var(--white)', letterSpacing: '-1px' }}>{name}</h1>
         <div style={{ fontSize: 11, marginTop: 6 }}>
-          <a href={`https://opensea.io/collection/${slug}`} target="_blank" rel="noreferrer"
-            style={{ color: 'var(--cyan)', textDecoration: 'none' }}>
+          <a href={`https://opensea.io/collection/${slug}`} target="_blank" rel="noreferrer" style={{ color: 'var(--cyan)', textDecoration: 'none' }}>
             opensea.io/collection/{slug} ↗
           </a>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 1, background: 'var(--border)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden', marginBottom: 24 }}>
         {[
           { label: 'Floor Price', value: loadingStats ? '—' : stats?.floor.toFixed(4), sub: 'ETH', color: 'var(--white)' },
-          { label: 'Volume Total', value: loadingStats ? '—' : stats?.volume.toFixed(2), sub: 'ETH', color: 'var(--cyan)' },
-          { label: 'Momentum', value: loadingStats ? '—' : stats?.momentum, sub: 'vol / floor', color: 'var(--yellow)' },
+          { label: 'Volume 24h', value: loadingStats ? '—' : stats?.volume24h.toFixed(2), sub: 'ETH', color: 'var(--cyan)' },
+          { label: 'Sales 24h', value: loadingStats ? '—' : stats?.sales24h, sub: 'transactions', color: 'var(--yellow)' },
+          { label: 'Holders', value: loadingStats ? '—' : stats?.numOwners?.toLocaleString(), sub: `sur ${stats?.totalSupply?.toLocaleString() || '—'}`, color: 'var(--muted)' },
           { label: 'Score', value: loadingStats ? '—' : stats?.score, sub: 'algorithmique', color: 'var(--green)' },
         ].map(s => (
           <div key={s.label} style={{ background: 'var(--bg2)', padding: 20 }}>
             <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8 }}>{s.label}</div>
-            <div style={{ fontFamily: 'var(--display)', fontSize: 24, fontWeight: 800, color: s.color }}>{s.value || '—'}</div>
+            <div style={{ fontFamily: 'var(--display)', fontSize: 22, fontWeight: 800, color: s.color }}>{s.value || '—'}</div>
             <div style={{ fontSize: 11, color: 'var(--dim)', marginTop: 4 }}>{s.sub}</div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 16 }}>
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderBottom: '1px solid var(--border)', fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase' }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)' }} />
@@ -140,34 +147,44 @@ export default function Collection() {
             SNIPER LIVE
             <span style={{ marginLeft: 'auto', fontSize: 9, color: 'var(--dim)' }}>{sniperStatus}</span>
           </div>
-          <div style={{ maxHeight: 380, overflowY: 'auto' }}>
+          <div style={{ maxHeight: 400, overflowY: 'auto' }}>
             {listings.length === 0 ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>Aucun listing actif</div>
             ) : listings.slice(0, 20).map((item, i) => {
-              const isFloor = floor > 0 && item.price <= floor * 1.05;
+              const isDeal = floor > 0 && item.price <= floor * 1.05;
               const pct = floor > 0 ? ((item.price - floor) / floor * 100).toFixed(1) : null;
               const openseaUrl = item.contractAddress
                 ? `https://opensea.io/assets/abstract/${item.contractAddress}/${item.tokenId}`
                 : `https://opensea.io/collection/${slug}`;
               return (
                 <a key={i} href={openseaUrl} target="_blank" rel="noreferrer"
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${isFloor ? 'var(--green)' : 'var(--border2)'}`, textDecoration: 'none', transition: 'background 0.15s' }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: '1px solid var(--border)', borderLeft: `2px solid ${isDeal ? 'var(--green)' : 'var(--border2)'}`, textDecoration: 'none', transition: 'background 0.15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                 >
-                  <div>
-                    <div style={{ fontSize: 12, color: 'var(--text)' }}>#{item.tokenId}</div>
+                  <div style={{ width: 44, height: 44, borderRadius: 4, overflow: 'hidden', background: 'var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {item.image_url ? (
+                      <img src={item.image_url} alt={item.name || item.tokenId} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: 18, color: 'var(--border2)' }}>◈</span>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {item.name || `#${item.tokenId}`}
+                    </div>
                     {pct !== null && (
-                      <div style={{ fontSize: 10, color: isFloor ? 'var(--green)' : 'var(--muted)', marginTop: 2 }}>
-                        {isFloor ? `◉ FLOOR (+${pct}%)` : `+${pct}% vs floor`}
+                      <div style={{ fontSize: 10, color: isDeal ? 'var(--green)' : 'var(--muted)', marginTop: 2 }}>
+                        {isDeal ? `◉ FLOOR +${pct}%` : `+${pct}% vs floor`}
                       </div>
                     )}
                     <div style={{ fontSize: 9, color: 'var(--dim)', marginTop: 2 }}>Voir sur OpenSea ↗</div>
                   </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontFamily: 'var(--display)', fontWeight: 700, color: isFloor ? 'var(--green)' : 'var(--white)' }}>
-                      {item.price.toFixed(4)} ETH
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 13, color: isDeal ? 'var(--green)' : 'var(--white)' }}>
+                      {item.price.toFixed(4)}
                     </div>
+                    <div style={{ fontSize: 10, color: 'var(--dim)' }}>ETH</div>
                   </div>
                 </a>
               );
