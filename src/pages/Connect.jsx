@@ -1,17 +1,15 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLoginWithAbstract } from '@abstract-foundation/agw-react';
-import { useAccount } from 'wagmi';
 import Layout from '../components/Layout';
 
 export default function Connect() {
   const navigate = useNavigate();
   const { login, isPending } = useLoginWithAbstract();
-  const { isConnected } = useAccount();
 
-  useEffect(() => {
-    if (isConnected) navigate('/dashboard');
-  }, [isConnected, navigate]);
+  async function handleLogin() {
+    await login();
+    navigate('/dashboard');
+  }
 
   const features = ['Floor tracking live', 'Sniper 15s', 'Score & ranking', 'Données historiques'];
 
@@ -35,7 +33,7 @@ export default function Connect() {
           Connecte ton Abstract Global Wallet pour accéder au dashboard analytics. Aucune transaction requise.
         </p>
 
-        <button onClick={login} disabled={isPending} style={{
+        <button onClick={handleLogin} disabled={isPending} style={{
           display: 'inline-flex', alignItems: 'center', gap: 12,
           padding: '16px 40px', background: 'transparent',
           border: '1px solid var(--green)', color: 'var(--green)',
