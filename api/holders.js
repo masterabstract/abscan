@@ -3,42 +3,35 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { slug } = req.query;
-  if (!slug || !/^[a-z0-9\-_]+$/.test(slug))
-    return res.status(400).json({ error: 'Invalid slug' });
+  const { contract } = req.query;
+  if (!contract || !/^0x[a-fA-F0-9]{40}$/.test(contract))
+    return res.status(400).json({ error: 'Invalid contract address' });
 
-  const API_KEY = process.env.OPENSEA_API_KEY;
-  if (!API_KEY) return res.status(500).json({ error: 'API key not configured' });
+  const API_KEY = process.env.ABSCAN_API_KEY;
+  if (!API_KEY) return res.status(500).json({ error: 'ABSCAN_API_KEY not configured' });
 
   try {
-    // Fetch up to 200 NFTs to reconstruct holder distribution
-    let allNfts = [];
-    let cursor = null;
+    const url = `https://api.etherscan.io/v2/api?chainid=2324&module=account&action=tokennfttx&contractaddress=${contract}&page=1&offset=1000&sort=desc&apikey=${API_KEY}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
 
-    for (let i = 0; i < 2; i++) {
-      const url = `https://api.opensea.io/api/v2/collection/${slug}/nfts?limit=100${cursor ? `&next=${cursor}` : ''}`;
-      const r = await fetch(url, {
-        headers: { 'X-API-KEY': API_KEY, 'Accept': 'application/json' }
-      });
-      if (!r.ok) break;
-      const data = await r.json();
-      const nfts = data.nfts || [];
-      allNfts.push(...nfts);
-      cursor = data.next || null;
-      if (!cursor || nfts.length === 0) break;
+    if (data.status !== '1' || !Array.isArray(data.result)) {
+      return res.status(200).json({ owners: [], whaleCount: 0, top10Pct: '0', totalOwned: 0 });
     }
 
-    if (allNfts.length === 0) {
-      return res.status(200).json({ owners: [], whaleCount: 0, top10Pct: 0, totalOwned: 0 });
-    }
-
-    // Build owner map
-    const ownerMap = {};
-    for (const nft of allNfts) {
-      const owner = nft.owners?.[0]?.address || nft.owner || null;
-      if (owner && owner !== '0x0000000000000000000000000000000000000000') {
-        ownerMap[owner] = (ownerMap[owner] || 0) + 1;
+    const BURN = '0x0000000000000000000000000000000000000000';
+    const latestByToken = {};
+    for (const tx of data.result) {
+      if (!latestByToken[tx.tokenID]) {
+        latestByToken[tx.tokenID] = tx.to.toLowerCase();
       }
+    }
+
+    const ownerMap = {};
+    for (const owner of Object.values(latestByToken)) {
+      if (owner === BURN) continue;
+      ownerMap[owner] = (ownerMap[owner] || 0) + 1;
     }
 
     const sorted = Object.entries(ownerMap)
@@ -48,7 +41,7 @@ module.exports = async function handler(req, res) {
     const totalOwned = sorted.reduce((s, o) => s + o.quantity, 0);
     const top10 = sorted.slice(0, 10);
     const top10Supply = top10.reduce((s, o) => s + o.quantity, 0);
-    const top10Pct = totalOwned > 0 ? ((top10Supply / totalOwned) * 100).toFixed(1) : 0;
+    const top10Pct = totalOwned > 0 ? ((top10Supply / totalOwned) * 100).toFixed(1) : '0';
     const whaleCount = sorted.filter(o => o.quantity >= 5).length;
 
     res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=60');
