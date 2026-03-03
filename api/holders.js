@@ -11,48 +11,25 @@ module.exports = async function handler(req, res) {
   if (!API_KEY) return res.status(500).json({ error: 'ABSCAN_API_KEY not configured' });
 
   try {
-    let allTxs = [];
-    for (let page = 1; page <= 10; page++) {
-      // ✅ Correct endpoint: api.abscan.org
-      const url = `https://api.abscan.org/api?module=account&action=tokennfttx&contractaddress=${contract}&page=${page}&offset=1000&sort=desc&apikey=${API_KEY}`;
-      const r = await fetch(url);
-      if (!r.ok) break;
-      const data = await r.json();
-      if (data.status !== '1' || !Array.isArray(data.result) || data.result.length === 0) break;
-      allTxs = allTxs.concat(data.result);
-      if (data.result.length < 1000) break;
-    }
+    const url = `https://api.abscan.org/api?module=account&action=tokennfttx&contractaddress=${contract}&page=1&offset=10&sort=desc&apikey=${API_KEY}`;
+    
+    const r = await fetch(url);
+    const rawText = await r.text();
+    
+    let parsed;
+    try { parsed = JSON.parse(rawText); } catch(e) { parsed = null; }
 
-    if (allTxs.length === 0) {
-      return res.status(200).json({ owners: [], whaleCount: 0, top10Pct: '0', totalOwned: 0 });
-    }
-
-    const BURN = '0x0000000000000000000000000000000000000000';
-    const latestByToken = {};
-    for (const tx of allTxs) {
-      if (!latestByToken[tx.tokenID]) {
-        latestByToken[tx.tokenID] = tx.to.toLowerCase();
-      }
-    }
-
-    const ownerMap = {};
-    for (const owner of Object.values(latestByToken)) {
-      if (owner === BURN) continue;
-      ownerMap[owner] = (ownerMap[owner] || 0) + 1;
-    }
-
-    const sorted = Object.entries(ownerMap)
-      .map(([address, quantity]) => ({ address, quantity }))
-      .sort((a, b) => b.quantity - a.quantity);
-
-    const totalOwned = sorted.reduce((s, o) => s + o.quantity, 0);
-    const top10 = sorted.slice(0, 10);
-    const top10Supply = top10.reduce((s, o) => s + o.quantity, 0);
-    const top10Pct = totalOwned > 0 ? ((top10Supply / totalOwned) * 100).toFixed(1) : '0';
-    const whaleCount = sorted.filter(o => o.quantity >= 5).length;
-
-    res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=60');
-    return res.status(200).json({ owners: top10, whaleCount, top10Pct, totalOwned });
+    return res.status(200).json({
+      debug: true,
+      httpStatus: r.status,
+      httpOk: r.ok,
+      url_used: url.replace(API_KEY, 'REDACTED'),
+      rawResponse: rawText.slice(0, 500),
+      parsedStatus: parsed?.status,
+      parsedMessage: parsed?.message,
+      resultLength: Array.isArray(parsed?.result) ? parsed.result.length : typeof parsed?.result,
+      firstTx: Array.isArray(parsed?.result) ? parsed.result[0] : null,
+    });
 
   } catch(e) {
     return res.status(500).json({ error: e.message });
