@@ -1,4 +1,4 @@
-// v4
+// v5
 const WETH = '0x3439153eb7af838ad19d56e1571fbd09333c2809';
 const BURN = '0x0000000000000000000000000000000000000000';
 const FEE_ADDR = '0x0000a26b00c1f0df003000390027140000faa719';
@@ -39,23 +39,28 @@ module.exports = async function handler(req, res) {
 
     const nonMintTxs = allTxs.filter(tx => tx.from.toLowerCase() !== BURN);
 
-    // 2. Fetch WETH transfers per unique seller — sequential with delay to avoid rate limit
+    // 2. Fetch WETH transfers for both sellers AND buyers
     const uniqueSellers = [...new Set(nonMintTxs.map(t => t.from.toLowerCase()))];
-    const wethByHash = {};
-    let wethCallsOk = 0;
+    const uniqueBuyers = [...new Set(nonMintTxs.map(t => t.to.toLowerCase()))];
+    // Combine unique wallets, prioritize sellers first
+    const allWallets = [...new Set([...uniqueSellers, ...uniqueBuyers])].slice(0, 50);
 
-    for (const seller of uniqueSellers.slice(0, 40)) {
+    const wethByHash = {};
+
+    for (const wallet of allWallets) {
       try {
-        await sleep(150); // 150ms between calls = ~6/sec, safe for Abscan
-        const d = await base({ module: 'account', action: 'tokentx', contractaddress: WETH, address: seller, page: 1, offset: 1000, sort: 'asc' });
-        if (d.status === '1' && arr(d.result).length > 0) {
-          wethCallsOk++;
-          for (const tx of d.result) {
-            const to = tx.to.toLowerCase();
-            const from = tx.from.toLowerCase();
-            if (to === seller && from !== FEE_ADDR) {
-              const val = parseFloat(tx.value) / 1e18;
-              if (val > 0.0001) {
+        await sleep(150);
+        const d = await base({ module: 'account', action: 'tokentx', contractaddress: WETH, address: wallet, page: 1, offset: 1000, sort: 'asc' });
+        if (d.status !== '1' || !arr(d.result).length) continue;
+        for (const tx of d.result) {
+          const to = tx.to.toLowerCase();
+          const from = tx.from.toLowerCase();
+          // Count WETH received by any non-fee address
+          if (to !== FEE_ADDR && from !== FEE_ADDR) {
+            const val = parseFloat(tx.value) / 1e18;
+            if (val > 0.0001) {
+              // Store as received by seller (to address)
+              if (uniqueSellers.includes(to)) {
                 wethByHash[tx.hash] = (wethByHash[tx.hash] || 0) + val;
               }
             }
@@ -169,9 +174,7 @@ module.exports = async function handler(req, res) {
       mintCount: allTxs.filter(t => t.from.toLowerCase() === BURN).length,
       onChainFloor: recentPrices[0] || null,
       onChainAvgRecent: recentPrices.length ? parseFloat((recentPrices.reduce((a,b)=>a+b,0)/recentPrices.length).toFixed(4)) : null,
-      sellersIndexed: Math.min(uniqueSellers.length, 40),
       wethHashesFound: Object.keys(wethByHash).length,
-      wethCallsOk,
     });
 
   } catch(e) {
