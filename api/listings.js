@@ -12,14 +12,25 @@ module.exports = async function handler(req, res) {
 
   try {
     const r = await fetch(
-      `https://api.opensea.io/api/v2/listings/collection/${slug}/all?limit=${Math.min(parseInt(limit), 50)}`,
+      `https://api.opensea.io/api/v2/listings/collection/${slug}/all?limit=50`,
       { headers: { 'X-API-KEY': API_KEY, 'Accept': 'application/json' } }
     );
     if (!r.ok) return res.status(r.status).json({ error: await r.text() });
     const data = await r.json();
 
     const listings = data.listings || [];
-    const enriched = await Promise.all(listings.map(async l => {
+
+    // Deduplicate by tokenId — keep last listing per token (most recent)
+    const byToken = {};
+    for (const l of listings) {
+      const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria;
+      if (!tokenId) continue;
+      byToken[tokenId] = l; // overwrite → last in array = most recent
+    }
+    const deduped = Object.values(byToken);
+
+    // Enrich with NFT images
+    const enriched = await Promise.all(deduped.map(async l => {
       try {
         const tokenId = l.protocol_data?.parameters?.offer?.[0]?.identifierOrCriteria;
         const contractAddress = l.protocol_data?.parameters?.offer?.[0]?.token;

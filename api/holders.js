@@ -11,18 +11,26 @@ module.exports = async function handler(req, res) {
   if (!API_KEY) return res.status(500).json({ error: 'ABSCAN_API_KEY not configured' });
 
   try {
-    const url = `https://api.etherscan.io/v2/api?chainid=2324&module=account&action=tokennfttx&contractaddress=${contract}&page=1&offset=1000&sort=desc&apikey=${API_KEY}`;
-    const r = await fetch(url);
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json();
+    // Fetch up to 10 pages × 1000 = 10000 transfers
+    let allTxs = [];
+    for (let page = 1; page <= 10; page++) {
+      const url = `https://api.etherscan.io/v2/api?chainid=2324&module=account&action=tokennfttx&contractaddress=${contract}&page=${page}&offset=1000&sort=desc&apikey=${API_KEY}`;
+      const r = await fetch(url);
+      if (!r.ok) break;
+      const data = await r.json();
+      if (data.status !== '1' || !Array.isArray(data.result) || data.result.length === 0) break;
+      allTxs = allTxs.concat(data.result);
+      if (data.result.length < 1000) break;
+    }
 
-    if (data.status !== '1' || !Array.isArray(data.result)) {
+    if (allTxs.length === 0) {
       return res.status(200).json({ owners: [], whaleCount: 0, top10Pct: '0', totalOwned: 0 });
     }
 
+    // First occurrence per tokenId (sorted desc) = current owner
     const BURN = '0x0000000000000000000000000000000000000000';
     const latestByToken = {};
-    for (const tx of data.result) {
+    for (const tx of allTxs) {
       if (!latestByToken[tx.tokenID]) {
         latestByToken[tx.tokenID] = tx.to.toLowerCase();
       }
