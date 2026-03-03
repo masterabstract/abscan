@@ -11,10 +11,10 @@ module.exports = async function handler(req, res) {
   if (!API_KEY) return res.status(500).json({ error: 'ABSCAN_API_KEY not configured' });
 
   try {
-    // Fetch up to 10 pages × 1000 = 10000 transfers
     let allTxs = [];
     for (let page = 1; page <= 10; page++) {
-      const url = `https://api.etherscan.io/v2/api?chainid=2324&module=account&action=tokennfttx&contractaddress=${contract}&page=${page}&offset=1000&sort=desc&apikey=${API_KEY}`;
+      // ✅ Correct endpoint: api.abscan.org
+      const url = `https://api.abscan.org/api?module=account&action=tokennfttx&contractaddress=${contract}&page=${page}&offset=1000&sort=desc&apikey=${API_KEY}`;
       const r = await fetch(url);
       if (!r.ok) break;
       const data = await r.json();
@@ -27,7 +27,6 @@ module.exports = async function handler(req, res) {
       return res.status(200).json({ owners: [], whaleCount: 0, top10Pct: '0', totalOwned: 0 });
     }
 
-    // First occurrence per tokenId (sorted desc) = current owner
     const BURN = '0x0000000000000000000000000000000000000000';
     const latestByToken = {};
     for (const tx of allTxs) {

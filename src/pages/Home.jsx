@@ -43,8 +43,8 @@ export default function Home() {
       </nav>
 
       {/* HERO */}
-      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 1280, margin: '0 auto', padding: '0 24px', paddingTop: 65 }}>
-        <div style={{ maxWidth: 800 }}>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', maxWidth: 1280, margin: '0 auto', padding: '0 24px', paddingTop: 65 }}>
+        <div style={{ maxWidth: 800, textAlign: 'center', width: '100%' }}>
           <div className="hero-title" style={{ marginBottom: 8 }}>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 10, color: 'var(--green)', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 24 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--green)', display: 'inline-block', animation: 'pulse 2s infinite' }} />
@@ -57,12 +57,12 @@ export default function Home() {
             </h1>
           </div>
 
-          <p className="hero-sub" style={{ color: 'var(--muted)', fontSize: 16, lineHeight: 2, maxWidth: 520, marginBottom: 40 }}>
+          <p className="hero-sub" style={{ color: 'var(--muted)', fontSize: 16, lineHeight: 2, maxWidth: 520, marginBottom: 40, margin: '0 auto 40px' }}>
             Floor tracking. Volume momentum. Real-time sniper.<br />
             Raw data for serious traders on <span style={{ color: 'var(--white)' }}>Abstract Network</span>.
           </p>
 
-          <div className="hero-actions" style={{ display: 'flex', gap: 12, marginBottom: 80 }}>
+          <div className="hero-actions" style={{ display: 'flex', gap: 12, marginBottom: 80, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link to="/dashboard" style={{
               display: 'inline-flex', alignItems: 'center', gap: 10,
               padding: '16px 36px', background: 'var(--green)', color: '#000',
@@ -81,14 +81,14 @@ export default function Home() {
             }}>Submit a collection</Link>
           </div>
 
-          <div className="hero-stats" style={{ display: 'flex', gap: 48, paddingTop: 40, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
+          <div className="hero-stats" style={{ display: 'flex', gap: 48, paddingTop: 40, borderTop: '1px solid var(--border)', flexWrap: 'wrap', justifyContent: 'center' }}>
             {[
               { num: '5', label: 'Tracked collections' },
               { num: '15s', label: 'Sniper refresh rate' },
               { num: '24/7', label: 'Live data' },
               { num: '100%', label: 'On-chain data' },
             ].map(s => (
-              <div key={s.label}>
+              <div key={s.label} style={{ textAlign: 'center' }}>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 36, fontWeight: 700, color: 'var(--white)', lineHeight: 1 }}>{s.num}</div>
                 <div style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginTop: 6 }}>{s.label}</div>
               </div>
