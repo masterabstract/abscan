@@ -37,24 +37,34 @@ module.exports = async function handler(req, res) {
     const nonMintTxs = allTxs.filter(tx => tx.from.toLowerCase() !== BURN);
 
     // 2. Fetch WETH transfers per unique seller
+    // wethByHash[hash] = total WETH received by seller in that tx
     const uniqueSellers = [...new Set(nonMintTxs.map(t => t.from.toLowerCase()))];
     const wethByHash = {};
 
-    const batchSize = 5;
-    for (let i = 0; i < Math.min(uniqueSellers.length, 50); i += batchSize) {
-      const batch = uniqueSellers.slice(i, i + batchSize);
-      await Promise.all(batch.map(async (seller) => {
+    await Promise.all(
+      uniqueSellers.slice(0, 60).map(async (seller) => {
         try {
-          const d = await base({ module: 'account', action: 'tokentx', contractaddress: WETH, address: seller, page: 1, offset: 1000, sort: 'asc' });
-          for (const tx of arr(d.result)) {
-            if (tx.to.toLowerCase() === seller && tx.from.toLowerCase() !== FEE_ADDR) {
-              const val = parseFloat(tx.value) / 1e18;
-              if (val > 0.0001) wethByHash[tx.hash] = (wethByHash[tx.hash] || 0) + val;
+          // Fetch all pages of WETH transfers for this seller
+          for (let page = 1; page <= 3; page++) {
+            const d = await base({ module: 'account', action: 'tokentx', contractaddress: WETH, address: seller, page, offset: 1000, sort: 'asc' });
+            if (d.status !== '1' || !arr(d.result).length) break;
+            for (const tx of d.result) {
+              const to = tx.to.toLowerCase();
+              const from = tx.from.toLowerCase();
+              // WETH received by seller (payment) — exclude fee transfers sent by seller
+              if (to === seller && from !== FEE_ADDR) {
+                const val = parseFloat(tx.value) / 1e18;
+                if (val > 0.0001) {
+                  if (!wethByHash[tx.hash]) wethByHash[tx.hash] = 0;
+                  wethByHash[tx.hash] += val;
+                }
+              }
             }
+            if (d.result.length < 1000) break;
           }
         } catch(e) {}
-      }));
-    }
+      })
+    );
 
     const getPrice = (hash) => wethByHash[hash] || 0;
 
@@ -63,16 +73,20 @@ module.exports = async function handler(req, res) {
     const dailyMap = {};
     const saleTxs = [];
 
+    // Deduplicate transfers by hash (one tx can transfer multiple NFTs)
+    const seenHashes = new Set();
     for (const tx of nonMintTxs) {
       const date = new Date(Number(tx.timeStamp) * 1000).toISOString().slice(0, 10);
-      const price = getPrice(tx.hash);
       if (!dailyMap[date]) dailyMap[date] = { date, sales: 0, volume: 0, prices: [] };
       dailyMap[date].sales++;
-      saleTxs.push({ hash: tx.hash, tokenID: tx.tokenID, price, from: tx.from, to: tx.to, timestamp: Number(tx.timeStamp) });
-      if (price > 0) {
+      const price = getPrice(tx.hash);
+      // Only count price once per tx hash (avoid double counting multi-NFT sales)
+      if (price > 0 && !seenHashes.has(tx.hash)) {
+        seenHashes.add(tx.hash);
         dailyMap[date].volume += price;
         dailyMap[date].prices.push(price);
       }
+      saleTxs.push({ hash: tx.hash, tokenID: tx.tokenID, price, from: tx.from, to: tx.to, timestamp: Number(tx.timeStamp) });
     }
 
     const priceHistory = Object.values(dailyMap)
@@ -159,7 +173,8 @@ module.exports = async function handler(req, res) {
       mintCount: allTxs.filter(t => t.from.toLowerCase() === BURN).length,
       onChainFloor: recentPrices[0] || null,
       onChainAvgRecent: recentPrices.length ? parseFloat((recentPrices.reduce((a,b)=>a+b,0)/recentPrices.length).toFixed(4)) : null,
-      sellersIndexed: Math.min(uniqueSellers.length, 50),
+      sellersIndexed: Math.min(uniqueSellers.length, 60),
+      wethHashesFound: Object.keys(wethByHash).length,
     });
 
   } catch(e) {
