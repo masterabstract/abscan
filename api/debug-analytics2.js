@@ -2,15 +2,12 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const { contract } = req.query;
   if (!contract) return res.status(400).json({ error: 'contract required' });
-
   const KEY = process.env.ABSCAN_API_KEY;
   const base = (params) => {
     const qs = new URLSearchParams({ chainid: '2741', apikey: KEY, ...params }).toString();
     return fetch(`https://api.etherscan.io/v2/api?${qs}`).then(r => r.json());
   };
-
   const saleTxHash = '0x27c5616cc9a8b3e4b3f1c32d58f4718ac8b12665bcbd1250440a1f26c63fdbe6';
-
   try {
     const receipt = await base({ module: 'proxy', action: 'eth_getTransactionReceipt', txhash: saleTxHash });
     const txFull = await base({ module: 'proxy', action: 'eth_getTransactionByHash', txhash: saleTxHash });
@@ -25,7 +22,6 @@ module.exports = async function handler(req, res) {
     if (txTo) {
       marketplaceInternal = await base({ module: 'account', action: 'txlistinternal', address: txTo, page: 1, offset: 10, sort: 'desc' });
     }
-
     return res.status(200).json({
       txTo,
       txValue: txFull.result?.value,
@@ -51,3 +47,4 @@ module.exports = async function handler(req, res) {
   } catch(e) {
     return res.status(500).json({ error: e.message });
   }
+};
