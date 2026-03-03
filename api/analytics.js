@@ -1,4 +1,4 @@
-// v5
+// v6
 const WETH = '0x3439153eb7af838ad19d56e1571fbd09333c2809';
 const BURN = '0x0000000000000000000000000000000000000000';
 const FEE_ADDR = '0x0000a26b00c1f0df003000390027140000faa719';
@@ -25,7 +25,16 @@ module.exports = async function handler(req, res) {
   const arr = (x) => Array.isArray(x) ? x : [];
 
   try {
-    // 1. All NFT transfers
+    // 1. Fetch NFT transfers DESC (most recent first) to get latest sales
+    let recentTxs = [];
+    for (let page = 1; page <= 10; page++) {
+      const d = await base({ module: 'account', action: 'tokennfttx', contractaddress: contract, page, offset: 1000, sort: 'desc' });
+      if (d.status !== '1' || !arr(d.result).length) break;
+      recentTxs = recentTxs.concat(d.result);
+      if (d.result.length < 1000) break;
+    }
+
+    // Also fetch ASC to get full holder picture
     let allTxs = [];
     for (let page = 1; page <= 10; page++) {
       const d = await base({ module: 'account', action: 'tokennfttx', contractaddress: contract, page, offset: 1000, sort: 'asc' });
@@ -34,36 +43,39 @@ module.exports = async function handler(req, res) {
       if (d.result.length < 1000) break;
     }
 
+    // Merge and deduplicate by hash+tokenID
+    const txMap = new Map();
+    for (const tx of [...allTxs, ...recentTxs]) {
+      txMap.set(tx.hash + tx.tokenID, tx);
+    }
+    allTxs = [...txMap.values()].sort((a, b) => Number(a.timeStamp) - Number(b.timeStamp));
+
     if (!allTxs.length)
       return res.status(200).json({ priceHistory: [], holderTypes: {}, washTrades: [], washScore: 0, totalSales: 0, totalTransfers: 0, mintCount: 0 });
 
     const nonMintTxs = allTxs.filter(tx => tx.from.toLowerCase() !== BURN);
+    // Focus on recent non-mint txs for price data (last 500)
+    const recentNonMints = nonMintTxs.slice(-500);
 
-    // 2. Fetch WETH transfers for both sellers AND buyers
-    const uniqueSellers = [...new Set(nonMintTxs.map(t => t.from.toLowerCase()))];
-    const uniqueBuyers = [...new Set(nonMintTxs.map(t => t.to.toLowerCase()))];
-    // Combine unique wallets, prioritize sellers first
-    const allWallets = [...new Set([...uniqueSellers, ...uniqueBuyers])].slice(0, 50);
+    // 2. Fetch WETH for sellers and buyers of recent txs
+    const recentSellers = [...new Set(recentNonMints.map(t => t.from.toLowerCase()))];
+    const recentBuyers = [...new Set(recentNonMints.map(t => t.to.toLowerCase()))];
+    const walletsToCheck = [...new Set([...recentSellers, ...recentBuyers])].slice(0, 50);
 
     const wethByHash = {};
 
-    for (const wallet of allWallets) {
+    for (const wallet of walletsToCheck) {
       try {
         await sleep(150);
-        const d = await base({ module: 'account', action: 'tokentx', contractaddress: WETH, address: wallet, page: 1, offset: 1000, sort: 'asc' });
+        const d = await base({ module: 'account', action: 'tokentx', contractaddress: WETH, address: wallet, page: 1, offset: 1000, sort: 'desc' });
         if (d.status !== '1' || !arr(d.result).length) continue;
         for (const tx of d.result) {
           const to = tx.to.toLowerCase();
           const from = tx.from.toLowerCase();
-          // Count WETH received by any non-fee address
-          if (to !== FEE_ADDR && from !== FEE_ADDR) {
-            const val = parseFloat(tx.value) / 1e18;
-            if (val > 0.0001) {
-              // Store as received by seller (to address)
-              if (uniqueSellers.includes(to)) {
-                wethByHash[tx.hash] = (wethByHash[tx.hash] || 0) + val;
-              }
-            }
+          if (to === FEE_ADDR || from === FEE_ADDR) continue;
+          const val = parseFloat(tx.value) / 1e18;
+          if (val > 0.0001 && recentSellers.includes(to)) {
+            wethByHash[tx.hash] = (wethByHash[tx.hash] || 0) + val;
           }
         }
       } catch(e) {}
@@ -71,14 +83,16 @@ module.exports = async function handler(req, res) {
 
     const getPrice = (hash) => wethByHash[hash] || 0;
 
-    // 3. Price History
+    // 3. Price History (last 30 days)
     const now = Math.floor(Date.now() / 1000);
+    const thirtyDaysAgo = now - 30 * 86400;
     const dailyMap = {};
     const saleTxs = [];
     const seenHashes = new Set();
 
     for (const tx of nonMintTxs) {
-      const date = new Date(Number(tx.timeStamp) * 1000).toISOString().slice(0, 10);
+      const ts = Number(tx.timeStamp);
+      const date = new Date(ts * 1000).toISOString().slice(0, 10);
       if (!dailyMap[date]) dailyMap[date] = { date, sales: 0, volume: 0, prices: [] };
       dailyMap[date].sales++;
       const price = getPrice(tx.hash);
@@ -87,7 +101,7 @@ module.exports = async function handler(req, res) {
         dailyMap[date].volume += price;
         dailyMap[date].prices.push(price);
       }
-      saleTxs.push({ hash: tx.hash, tokenID: tx.tokenID, price, from: tx.from, to: tx.to, timestamp: Number(tx.timeStamp) });
+      saleTxs.push({ hash: tx.hash, tokenID: tx.tokenID, price, from: tx.from, to: tx.to, timestamp: ts });
     }
 
     const priceHistory = Object.values(dailyMap)
