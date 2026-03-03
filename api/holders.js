@@ -11,7 +11,7 @@ module.exports = async function handler(req, res) {
   if (!API_KEY) return res.status(500).json({ error: 'ABSCAN_API_KEY not configured' });
 
   try {
-    const url = `https://api.abscan.org/api?module=account&action=tokennfttx&contractaddress=${contract}&page=1&offset=10&sort=desc&apikey=${API_KEY}`;
+    const url = `https://api.etherscan.io/v2/api?chainid=2324&module=account&action=tokennfttx&contractaddress=${contract}&page=1&offset=10&sort=desc&apikey=${API_KEY}`;
     
     const r = await fetch(url);
     const rawText = await r.text();
@@ -22,7 +22,6 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({
       debug: true,
       httpStatus: r.status,
-      httpOk: r.ok,
       url_used: url.replace(API_KEY, 'REDACTED'),
       rawResponse: rawText.slice(0, 500),
       parsedStatus: parsed?.status,
