@@ -1,4 +1,3 @@
-// analytics.js — OpenSea (prix) + Abstract on-chain (holders, wash trading)
 const BURN = '0x0000000000000000000000000000000000000000';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -28,7 +27,7 @@ module.exports = async function handler(req, res) {
     return r.json();
   };
 
-  // Récupère jusqu'à 300 ventes OpenSea (6 pages x 50)
+  // Récupère jusqu'à 300 ventes OpenSea (source de vérité pour les prix)
   const fetchOpenSeaSales = async () => {
     let sales = [];
     let next = null;
@@ -59,7 +58,7 @@ module.exports = async function handler(req, res) {
   };
 
   try {
-    // 1. Transfers on-chain (pour holders + wash trading)
+    // ── 1. Tous les transfers on-chain en ASC (source de vérité pour holders) ──
     let allTxs = [];
     for (let page = 1; page <= 10; page++) {
       const d = await abscan({
@@ -78,10 +77,13 @@ module.exports = async function handler(req, res) {
         floorPrice: null, avgPrice: null,
       });
 
-    // 2. Ventes OpenSea (source de vérité pour les prix)
+    const nonMintTxs = allTxs.filter(tx => tx.from.toLowerCase() !== BURN);
+    const mintCount = allTxs.length - nonMintTxs.length;
+
+    // ── 2. Ventes OpenSea (source de vérité pour les prix) ──────────────────
     const osSales = await fetchOpenSeaSales();
 
-    // 3. Price History basé sur OpenSea
+    // ── 3. Price History — basé sur OpenSea (prix réels) ────────────────────
     const dailyMap = {};
     for (const sale of osSales) {
       const date = new Date(sale.timestamp * 1000).toISOString().slice(0, 10);
@@ -91,19 +93,31 @@ module.exports = async function handler(req, res) {
       dailyMap[date].prices.push(sale.price);
     }
 
-    const priceHistory = Object.values(dailyMap)
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .map(d => ({
-        date: d.date,
-        sales: d.sales,
-        volume: parseFloat(d.volume.toFixed(4)),
-        avgPrice: parseFloat((d.prices.reduce((a, b) => a + b, 0) / d.prices.length).toFixed(4)),
-        minPrice: parseFloat(Math.min(...d.prices).toFixed(4)),
-        maxPrice: parseFloat(Math.max(...d.prices).toFixed(4)),
+    // ✅ Transfer Activity on-chain séparé (pour le graphique "Transfer Activity")
+    const transferDailyMap = {};
+    for (const tx of nonMintTxs) {
+      const date = new Date(Number(tx.timeStamp) * 1000).toISOString().slice(0, 10);
+      transferDailyMap[date] = (transferDailyMap[date] || 0) + 1;
+    }
+
+    const priceHistory = Object.keys({ ...dailyMap, ...transferDailyMap })
+      .sort()
+      .map(date => ({
+        date,
+        // Transfers on-chain réels (pour le graphique Transfer Activity)
+        sales: transferDailyMap[date] || 0,
+        // Données de prix OpenSea
+        volume: dailyMap[date] ? parseFloat(dailyMap[date].volume.toFixed(4)) : 0,
+        avgPrice: dailyMap[date]
+          ? parseFloat((dailyMap[date].prices.reduce((a, b) => a + b, 0) / dailyMap[date].prices.length).toFixed(4))
+          : null,
+        minPrice: dailyMap[date] ? parseFloat(Math.min(...dailyMap[date].prices).toFixed(4)) : null,
+        maxPrice: dailyMap[date] ? parseFloat(Math.max(...dailyMap[date].prices).toFixed(4)) : null,
+        osSales: dailyMap[date]?.sales || 0,
       }))
       .slice(-30);
 
-    // 4. Floor price & avg (20 dernières ventes OpenSea)
+    // ── 4. Floor price & avg (20 dernières ventes OpenSea) ──────────────────
     const recentSalePrices = [...osSales]
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 20)
@@ -115,37 +129,49 @@ module.exports = async function handler(req, res) {
       ? parseFloat((recentSalePrices.reduce((a, b) => a + b, 0) / recentSalePrices.length).toFixed(4))
       : null;
 
-    // 5. Holder Distribution (on-chain)
+    // ── 5. Holder Distribution (100% on-chain) ───────────────────────────────
+    // ✅ On reconstruit l'état actuel token par token (comme holders.js)
     const now = Math.floor(Date.now() / 1000);
-    const osSellerSet = new Set(osSales.map(s => s.seller));
-    const currentHolders = {};
-    const walletSellCount = {};
+    const tokenOwner = {};       // tokenId → owner actuel
+    const tokenAcquired = {};    // tokenId → timestamp d'acquisition par owner actuel
+    const walletSellCount = {};  // wallet → nb de transfers sortants (hors mint)
 
     for (const tx of allTxs) {
       const to = tx.to.toLowerCase();
       const from = tx.from.toLowerCase();
       const ts = Number(tx.timeStamp);
+
+      // Mise à jour owner actuel
       if (to !== BURN) {
-        if (!currentHolders[to]) currentHolders[to] = {};
-        currentHolders[to][tx.tokenID] = ts;
+        tokenOwner[tx.tokenID] = to;
+        tokenAcquired[tx.tokenID] = ts;
+      } else {
+        delete tokenOwner[tx.tokenID];
+        delete tokenAcquired[tx.tokenID];
       }
+
+      // ✅ Compte les ventes réelles (transfers sortants hors mint)
       if (from !== BURN) {
-        if (currentHolders[from]) delete currentHolders[from][tx.tokenID];
-        if (osSellerSet.has(from)) {
-          walletSellCount[from] = (walletSellCount[from] || 0) + 1;
-        }
+        walletSellCount[from] = (walletSellCount[from] || 0) + 1;
       }
+    }
+
+    // Regroupe par wallet
+    const walletTokens = {};
+    for (const [tokenId, owner] of Object.entries(tokenOwner)) {
+      if (!walletTokens[owner]) walletTokens[owner] = [];
+      walletTokens[owner].push({ tokenId, acquired: tokenAcquired[tokenId] || now });
     }
 
     let diamonds = 0, flippers = 0, traders = 0;
     const holdTimes = [];
 
-    for (const [wallet, tokens] of Object.entries(currentHolders)) {
-      const ownedCount = Object.keys(tokens).length;
-      if (ownedCount === 0) continue;
-      const avgAcquired = Object.values(tokens).reduce((a, b) => a + b, 0) / ownedCount;
+    for (const [wallet, tokens] of Object.entries(walletTokens)) {
+      if (!tokens.length) continue;
+      const avgAcquired = tokens.reduce((s, t) => s + t.acquired, 0) / tokens.length;
       const holdDays = (now - avgAcquired) / 86400;
       holdTimes.push(holdDays);
+      // ✅ sells = tous les transfers sortants on-chain (pas seulement OpenSea)
       const sells = walletSellCount[wallet] || 0;
       if (holdDays > 30 && sells === 0) diamonds++;
       else if (sells > 2 || holdDays < 3) flippers++;
@@ -156,7 +182,7 @@ module.exports = async function handler(req, res) {
       ? Math.round(holdTimes.reduce((a, b) => a + b, 0) / holdTimes.length)
       : 0;
 
-    // 6. Wash Trading (on-chain)
+    // ── 6. Wash Trading (on-chain) ───────────────────────────────────────────
     const tokenHistory = {};
     for (const tx of allTxs) {
       if (!tokenHistory[tx.tokenID]) tokenHistory[tx.tokenID] = [];
@@ -164,7 +190,6 @@ module.exports = async function handler(req, res) {
         from: tx.from.toLowerCase(),
         to: tx.to.toLowerCase(),
         ts: Number(tx.timeStamp),
-        hash: tx.hash,
       });
     }
 
@@ -182,8 +207,9 @@ module.exports = async function handler(req, res) {
       for (const p of Object.values(pairs)) if (p.count >= 1) washTrades.push(p);
     }
 
+    // ✅ washScore basé sur les transfers on-chain (pas les ventes OpenSea)
     const washScore = Math.min(100, Math.round(
-      (washTrades.length / Math.max(osSales.length, 1)) * 1000
+      (washTrades.length / Math.max(nonMintTxs.length, 1)) * 1000
     ));
 
     res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
@@ -193,8 +219,8 @@ module.exports = async function handler(req, res) {
       washTrades: washTrades.slice(0, 20),
       washScore,
       totalSales: osSales.length,
-      totalTransfers: allTxs.length,
-      mintCount: allTxs.filter(t => t.from.toLowerCase() === BURN).length,
+      totalTransfers: nonMintTxs.length,
+      mintCount,
       floorPrice,
       avgPrice,
     });

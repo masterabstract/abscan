@@ -1,3 +1,5 @@
+const BURN = '0x0000000000000000000000000000000000000000';
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -11,9 +13,10 @@ module.exports = async function handler(req, res) {
   if (!API_KEY) return res.status(500).json({ error: 'ABSCAN_API_KEY not configured' });
 
   try {
+    // ✅ Récupère en ASC pour reconstruire l'historique complet dans l'ordre
     let allTxs = [];
     for (let page = 1; page <= 10; page++) {
-      const url = `https://api.etherscan.io/v2/api?chainid=2741&module=account&action=tokennfttx&contractaddress=${contract}&page=${page}&offset=1000&sort=desc&apikey=${API_KEY}`;
+      const url = `https://api.etherscan.io/v2/api?chainid=2741&module=account&action=tokennfttx&contractaddress=${contract}&page=${page}&offset=1000&sort=asc&apikey=${API_KEY}`;
       const r = await fetch(url);
       if (!r.ok) break;
       const data = await r.json();
@@ -22,20 +25,20 @@ module.exports = async function handler(req, res) {
       if (data.result.length < 1000) break;
     }
 
-    if (allTxs.length === 0) {
+    if (allTxs.length === 0)
       return res.status(200).json({ owners: [], whaleCount: 0, top10Pct: '0', totalOwned: 0 });
-    }
 
-    const BURN = '0x0000000000000000000000000000000000000000';
-    const latestByToken = {};
+    // ✅ Reconstruit l'état actuel token par token en rejouant tous les transfers
+    const tokenOwner = {};
     for (const tx of allTxs) {
-      if (!latestByToken[tx.tokenID]) {
-        latestByToken[tx.tokenID] = tx.to.toLowerCase();
-      }
+      const to = tx.to.toLowerCase();
+      // Le dernier "to" de chaque token = propriétaire actuel
+      tokenOwner[tx.tokenID] = to;
     }
 
+    // Compte les tokens par owner (exclut burn)
     const ownerMap = {};
-    for (const owner of Object.values(latestByToken)) {
+    for (const owner of Object.values(tokenOwner)) {
       if (owner === BURN) continue;
       ownerMap[owner] = (ownerMap[owner] || 0) + 1;
     }
@@ -53,7 +56,7 @@ module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=60');
     return res.status(200).json({ owners: top10, whaleCount, top10Pct, totalOwned });
 
-  } catch(e) {
+  } catch (e) {
     return res.status(500).json({ error: e.message });
   }
-}
+};
