@@ -23,41 +23,32 @@ module.exports = async function handler(req, res) {
     }
 
     if (allTxs.length === 0) {
-      return res.status(200).json({ priceHistory: [], holderTypes: {}, washTrades: [], washScore: 0 });
+      return res.status(200).json({ priceHistory: [], holderTypes: {}, washTrades: [], washScore: 0, totalSales: 0 });
     }
 
-    // ── 1. PRICE HISTORY ──
+    const BURN = '0x0000000000000000000000000000000000000000';
+
+    // ── 1. TRANSFER ACTIVITY ──
     const dailyMap = {};
     const saleTxs = [];
 
     for (const tx of allTxs) {
-      const ethValue = parseFloat(tx.value || 0) / 1e18;
       const date = new Date(Number(tx.timeStamp) * 1000).toISOString().slice(0, 10);
-      if (!dailyMap[date]) dailyMap[date] = { date, sales: 0, volume: 0, prices: [] };
-      dailyMap[date].sales++;
-      if (ethValue > 0.0001) {
-        dailyMap[date].volume += ethValue;
-        dailyMap[date].prices.push(ethValue);
-        saleTxs.push({ hash: tx.hash, tokenID: tx.tokenID, price: ethValue, from: tx.from, to: tx.to, timestamp: tx.timeStamp });
+      const isMint = tx.from.toLowerCase() === BURN;
+      if (!dailyMap[date]) dailyMap[date] = { date, sales: 0 };
+      if (!isMint) {
+        dailyMap[date].sales++;
+        saleTxs.push({ hash: tx.hash, tokenID: tx.tokenID, from: tx.from, to: tx.to, timestamp: tx.timeStamp });
       }
     }
 
     const priceHistory = Object.values(dailyMap)
       .sort((a, b) => a.date.localeCompare(b.date))
-      .map(d => ({
-        date: d.date,
-        sales: d.sales,
-        volume: parseFloat(d.volume.toFixed(4)),
-        avgPrice: d.prices.length ? parseFloat((d.prices.reduce((a,b)=>a+b,0)/d.prices.length).toFixed(4)) : null,
-        minPrice: d.prices.length ? parseFloat(Math.min(...d.prices).toFixed(4)) : null,
-        maxPrice: d.prices.length ? parseFloat(Math.max(...d.prices).toFixed(4)) : null,
-      }))
+      .map(d => ({ date: d.date, sales: d.sales, volume: null, avgPrice: null }))
       .slice(-30);
 
     // ── 2. HOLDER DISTRIBUTION ──
     const now = Math.floor(Date.now() / 1000);
-    const BURN = '0x0000000000000000000000000000000000000000';
-    const walletFirstBuy = {};
     const walletSaleCount = {};
     const currentHolders = {};
 
@@ -69,7 +60,6 @@ module.exports = async function handler(req, res) {
       if (to !== BURN) {
         if (!currentHolders[to]) currentHolders[to] = {};
         currentHolders[to][tokenId] = ts;
-        if (!walletFirstBuy[to] || ts < walletFirstBuy[to]) walletFirstBuy[to] = ts;
       }
       if (from !== BURN) {
         if (currentHolders[from]) delete currentHolders[from][tokenId];
@@ -83,7 +73,7 @@ module.exports = async function handler(req, res) {
     for (const [wallet, tokens] of Object.entries(currentHolders)) {
       const ownedCount = Object.keys(tokens).length;
       if (ownedCount === 0) continue;
-      const avgAcquired = Object.values(tokens).reduce((a,b)=>a+b,0) / ownedCount;
+      const avgAcquired = Object.values(tokens).reduce((a,b) => a+b, 0) / ownedCount;
       const holdDays = (now - avgAcquired) / 86400;
       holdTimes.push(holdDays);
       const sales = walletSaleCount[wallet] || 0;
@@ -92,13 +82,20 @@ module.exports = async function handler(req, res) {
       else traders++;
     }
 
-    const avgHoldDays = holdTimes.length ? Math.round(holdTimes.reduce((a,b)=>a+b,0)/holdTimes.length) : 0;
+    const avgHoldDays = holdTimes.length
+      ? Math.round(holdTimes.reduce((a,b) => a+b, 0) / holdTimes.length)
+      : 0;
 
     // ── 3. WASH TRADING ──
     const tokenHistory = {};
     for (const tx of allTxs) {
       if (!tokenHistory[tx.tokenID]) tokenHistory[tx.tokenID] = [];
-      tokenHistory[tx.tokenID].push({ from: tx.from.toLowerCase(), to: tx.to.toLowerCase(), ts: Number(tx.timeStamp), hash: tx.hash });
+      tokenHistory[tx.tokenID].push({
+        from: tx.from.toLowerCase(),
+        to: tx.to.toLowerCase(),
+        ts: Number(tx.timeStamp),
+        hash: tx.hash,
+      });
     }
 
     const washTrades = [];
@@ -113,18 +110,37 @@ module.exports = async function handler(req, res) {
           pairs[key].hashes.push(a.hash, b.hash);
         }
       }
-      for (const p of Object.values(pairs)) { if (p.count >= 1) washTrades.push(p); }
+      for (const p of Object.values(pairs)) {
+        if (p.count >= 1) washTrades.push(p);
+      }
     }
 
-    const washScore = Math.min(100, Math.round((washTrades.length / Math.max(saleTxs.length, 1)) * 1000));
+    const pairMap = {};
+    for (const w of washTrades) {
+      const key = [w.walletA, w.walletB].sort().join('-');
+      if (!pairMap[key]) pairMap[key] = { ...w, tokenIds: [w.tokenId], count: w.count };
+      else { pairMap[key].tokenIds.push(w.tokenId); pairMap[key].count += w.count; }
+    }
+    const dedupedWash = Object.values(pairMap).sort((a,b) => b.count - a.count);
+
+    const totalTransfers = saleTxs.length;
+    const washScore = totalTransfers > 0
+      ? Math.min(100, Math.round((dedupedWash.length / Math.sqrt(totalTransfers)) * 10))
+      : 0;
 
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=120');
     return res.status(200).json({
       priceHistory,
       holderTypes: { diamonds, flippers, traders, avgHoldDays },
-      washTrades: washTrades.slice(0, 20),
+      washTrades: dedupedWash.slice(0, 20).map(w => ({
+        tokenId: w.tokenIds.join(', #'),
+        walletA: w.walletA,
+        walletB: w.walletB,
+        count: w.count,
+        tokens: w.tokenIds.length,
+      })),
       washScore,
-      totalSales: saleTxs.length,
+      totalSales: totalTransfers,
     });
 
   } catch(e) {

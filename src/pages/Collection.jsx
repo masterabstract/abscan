@@ -238,31 +238,29 @@ function PriceHistory({ data }) {
   useEffect(() => {
     if (!canvasRef.current || !data?.length) return;
     if (chartRef.current) chartRef.current.destroy();
-    const filtered = data.filter(d => d.avgPrice !== null);
-    if (!filtered.length) return;
     const ctx = canvasRef.current.getContext('2d');
-    const gradG = ctx.createLinearGradient(0, 0, 0, 200);
-    gradG.addColorStop(0, 'rgba(0,255,136,0.18)');
-    gradG.addColorStop(1, 'rgba(0,255,136,0)');
-    const gradV = ctx.createLinearGradient(0, 0, 0, 200);
-    gradV.addColorStop(0, 'rgba(0,212,255,0.3)');
-    gradV.addColorStop(1, 'rgba(0,212,255,0)');
+    const gradC = ctx.createLinearGradient(0, 0, 0, 200);
+    gradC.addColorStop(0, 'rgba(0,212,255,0.35)');
+    gradC.addColorStop(1, 'rgba(0,212,255,0.03)');
     chartRef.current = new Chart(ctx, {
       type: 'bar',
       data: {
-        labels: filtered.map(d => d.date.slice(5)),
-        datasets: [
-          { type: 'line', label: 'Avg Price', data: filtered.map(d => d.avgPrice), borderColor: '#00ff88', borderWidth: 2, backgroundColor: gradG, fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#00ff88', yAxisID: 'y' },
-          { type: 'bar', label: 'Volume', data: filtered.map(d => d.volume), backgroundColor: gradV, yAxisID: 'y2', borderRadius: 2 },
-        ]
+        labels: data.map(d => d.date.slice(5)),
+        datasets: [{
+          label: 'Transfers',
+          data: data.map(d => d.sales),
+          backgroundColor: gradC,
+          borderColor: 'rgba(0,212,255,0.6)',
+          borderWidth: 1,
+          borderRadius: 2,
+        }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0a0a10', borderColor: '#1a1a2e', borderWidth: 1, callbacks: { label: c => c.dataset.label === 'Avg Price' ? `Avg: ${c.raw} ETH` : `Vol: ${c.raw} ETH` } } },
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0a0a10', borderColor: '#1a1a2e', borderWidth: 1, callbacks: { label: c => `${c.raw} transfers` } } },
         scales: {
-          x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#3a3a5c', font: { size: 9 }, maxTicksLimit: 10 } },
-          y: { position: 'left', grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#00ff88', font: { size: 9 }, callback: v => v.toFixed(3) } },
-          y2: { position: 'right', grid: { display: false }, ticks: { color: 'var(--cyan)', font: { size: 9 }, callback: v => v.toFixed(2) } },
+          x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#3a3a5c', font: { size: 9 }, maxTicksLimit: 12 } },
+          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: 'rgba(0,212,255,0.6)', font: { size: 9 } } },
         }
       }
     });
@@ -271,27 +269,27 @@ function PriceHistory({ data }) {
 
   if (!data?.length) return (
     <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-      <SectionHeader dot="var(--green)" label="Price History — On-Chain" badge />
-      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>No on-chain sales data yet</div>
+      <SectionHeader dot="var(--cyan)" label="Transfer Activity — On-Chain" badge />
+      <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 12 }}>No on-chain data yet</div>
     </div>
   );
 
-  const allPrices = data.filter(d => d.avgPrice).map(d => d.avgPrice);
-  const first = allPrices[0], last = allPrices[allPrices.length - 1];
-  const trend = first > 0 ? ((last - first) / first * 100).toFixed(1) : null;
-  const totalVol = data.reduce((s, d) => s + d.volume, 0);
-  const totalSales = data.reduce((s, d) => s + d.sales, 0);
+  const totalTransfers = data.reduce((s, d) => s + d.sales, 0);
+  const maxDay = data.reduce((m, d) => d.sales > m.sales ? d : m, data[0]);
+  const last7 = data.slice(-7).reduce((s, d) => s + d.sales, 0);
+  const prev7 = data.slice(-14, -7).reduce((s, d) => s + d.sales, 0);
+  const trend7 = prev7 > 0 ? ((last7 - prev7) / prev7 * 100).toFixed(0) : null;
 
   return (
     <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
-      <SectionHeader dot="var(--green)" label="Price History — On-Chain" badge tooltip="Real sale prices reconstructed from on-chain transfer data via Abscan. Not available on OpenSea." right={trend !== null ? `${trend >= 0 ? '▲' : '▼'} ${Math.abs(trend)}% 30d` : null} />
+      <SectionHeader dot="var(--cyan)" label="Transfer Activity — On-Chain" badge tooltip="Daily NFT transfer count from Abscan. Peaks = high trading activity. Exclusive to ABSTRACK." right={trend7 !== null ? `7d ${parseInt(trend7) >= 0 ? '▲' : '▼'} ${Math.abs(trend7)}%` : null} />
       <div style={{ padding: 20 }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 1, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', marginBottom: 16 }}>
           {[
-            { label: 'Avg Price', value: allPrices.length ? allPrices[allPrices.length-1].toFixed(4) : '—', sub: 'ETH latest', color: 'var(--green)' },
-            { label: '30d Volume', value: totalVol.toFixed(2), sub: 'ETH on-chain', color: 'var(--cyan)' },
-            { label: '30d Sales', value: totalSales, sub: 'transfers', color: 'var(--yellow)' },
-            { label: '30d Trend', value: trend !== null ? `${trend >= 0 ? '+' : ''}${trend}%` : '—', sub: 'price change', color: trend !== null && parseFloat(trend) >= 0 ? 'var(--green)' : '#ff4d4d' },
+            { label: '30d Transfers', value: totalTransfers, sub: 'total on-chain', color: 'var(--cyan)' },
+            { label: 'Peak Day', value: maxDay?.sales || 0, sub: maxDay?.date?.slice(5) || '—', color: 'var(--white)' },
+            { label: 'Last 7d', value: last7, sub: 'recent activity', color: 'var(--yellow)' },
+            { label: '7d Trend', value: trend7 !== null ? `${parseInt(trend7) >= 0 ? '+' : ''}${trend7}%` : '—', sub: 'vs prev week', color: trend7 !== null && parseInt(trend7) >= 0 ? 'var(--green)' : '#ff4d4d' },
           ].map(s => (
             <div key={s.label} style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 14px' }}>
               <div style={{ fontSize: 9, color: 'var(--muted)', letterSpacing: 2, textTransform: 'uppercase', marginBottom: 4 }}>{s.label}</div>
@@ -301,7 +299,7 @@ function PriceHistory({ data }) {
           ))}
         </div>
         <div style={{ height: 200 }}><canvas ref={canvasRef} /></div>
-        <div style={{ marginTop: 10, fontSize: 9, color: 'var(--dim)', textAlign: 'right' }}>Green line = avg sale price · Blue bars = volume · Source: Abscan on-chain</div>
+        <div style={{ marginTop: 10, fontSize: 9, color: 'var(--dim)', textAlign: 'right' }}>Daily NFT transfers · Source: Abscan on-chain</div>
       </div>
     </div>
   );
