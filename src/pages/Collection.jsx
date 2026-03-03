@@ -320,7 +320,7 @@ export default function Collection() {
   async function loadHolders() {
     setLoadingHolders(true);
     try {
-      if (!collectionConfig?.contract) { setLoadingHolders(false); return; }
+     if (!collectionConfig?.contract) { setLoadingHolders(false); return; }
       const r = await fetch(`${API_BASE}/holders?contract=${collectionConfig.contract}`);
       if (r.ok) { const d = await r.json(); setHolders(d); }
     } catch(e) {}
