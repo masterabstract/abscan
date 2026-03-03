@@ -583,13 +583,13 @@ export default function Collection() {
   }
 
   async function loadAnalytics() {
-    setLoadingAnalytics(true);
-    try {
-      if (!collectionConfig?.contract) { setLoadingAnalytics(false); return; }
-      const r = await fetch(`${API_BASE}/analytics?contract=${collectionConfig.contract}`);
-      if (r.ok) { const d = await r.json(); setAnalytics(d); }
-    } catch(e) {}
-    setLoadingAnalytics(false);
+  setLoadingAnalytics(true);
+  try {
+    if (!collectionConfig?.contract) { setLoadingAnalytics(false); return; }
+    const r = await fetch(`${API_BASE}/analytics?contract=${collectionConfig.contract}&slug=${slug}`);
+    if (r.ok) { const d = await r.json(); setAnalytics(d); }
+  } catch(e) {}
+  setLoadingAnalytics(false);
   }
 
   function renderChart(currentFloor) {
