@@ -2,6 +2,8 @@ const WETH = '0x3439153eb7af838ad19d56e1571fbd09333c2809';
 const BURN = '0x0000000000000000000000000000000000000000';
 const FEE_ADDR = '0x0000a26b00c1f0df003000390027140000faa719';
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -36,35 +38,30 @@ module.exports = async function handler(req, res) {
 
     const nonMintTxs = allTxs.filter(tx => tx.from.toLowerCase() !== BURN);
 
-    // 2. Fetch WETH transfers per unique seller
-    // wethByHash[hash] = total WETH received by seller in that tx
+    // 2. Fetch WETH transfers per unique seller — sequential with delay to avoid rate limit
     const uniqueSellers = [...new Set(nonMintTxs.map(t => t.from.toLowerCase()))];
     const wethByHash = {};
+    let wethCallsOk = 0;
 
-    await Promise.all(
-      uniqueSellers.slice(0, 60).map(async (seller) => {
-        try {
-          // Fetch all pages of WETH transfers for this seller
-          for (let page = 1; page <= 3; page++) {
-            const d = await base({ module: 'account', action: 'tokentx', contractaddress: WETH, address: seller, page, offset: 1000, sort: 'asc' });
-            if (d.status !== '1' || !arr(d.result).length) break;
-            for (const tx of d.result) {
-              const to = tx.to.toLowerCase();
-              const from = tx.from.toLowerCase();
-              // WETH received by seller (payment) — exclude fee transfers sent by seller
-              if (to === seller && from !== FEE_ADDR) {
-                const val = parseFloat(tx.value) / 1e18;
-                if (val > 0.0001) {
-                  if (!wethByHash[tx.hash]) wethByHash[tx.hash] = 0;
-                  wethByHash[tx.hash] += val;
-                }
+    for (const seller of uniqueSellers.slice(0, 40)) {
+      try {
+        await sleep(150); // 150ms between calls = ~6/sec, safe for Abscan
+        const d = await base({ module: 'account', action: 'tokentx', contractaddress: WETH, address: seller, page: 1, offset: 1000, sort: 'asc' });
+        if (d.status === '1' && arr(d.result).length > 0) {
+          wethCallsOk++;
+          for (const tx of d.result) {
+            const to = tx.to.toLowerCase();
+            const from = tx.from.toLowerCase();
+            if (to === seller && from !== FEE_ADDR) {
+              const val = parseFloat(tx.value) / 1e18;
+              if (val > 0.0001) {
+                wethByHash[tx.hash] = (wethByHash[tx.hash] || 0) + val;
               }
             }
-            if (d.result.length < 1000) break;
           }
-        } catch(e) {}
-      })
-    );
+        }
+      } catch(e) {}
+    }
 
     const getPrice = (hash) => wethByHash[hash] || 0;
 
@@ -72,15 +69,13 @@ module.exports = async function handler(req, res) {
     const now = Math.floor(Date.now() / 1000);
     const dailyMap = {};
     const saleTxs = [];
-
-    // Deduplicate transfers by hash (one tx can transfer multiple NFTs)
     const seenHashes = new Set();
+
     for (const tx of nonMintTxs) {
       const date = new Date(Number(tx.timeStamp) * 1000).toISOString().slice(0, 10);
       if (!dailyMap[date]) dailyMap[date] = { date, sales: 0, volume: 0, prices: [] };
       dailyMap[date].sales++;
       const price = getPrice(tx.hash);
-      // Only count price once per tx hash (avoid double counting multi-NFT sales)
       if (price > 0 && !seenHashes.has(tx.hash)) {
         seenHashes.add(tx.hash);
         dailyMap[date].volume += price;
@@ -173,8 +168,9 @@ module.exports = async function handler(req, res) {
       mintCount: allTxs.filter(t => t.from.toLowerCase() === BURN).length,
       onChainFloor: recentPrices[0] || null,
       onChainAvgRecent: recentPrices.length ? parseFloat((recentPrices.reduce((a,b)=>a+b,0)/recentPrices.length).toFixed(4)) : null,
-      sellersIndexed: Math.min(uniqueSellers.length, 60),
+      sellersIndexed: Math.min(uniqueSellers.length, 40),
       wethHashesFound: Object.keys(wethByHash).length,
+      wethCallsOk,
     });
 
   } catch(e) {
